@@ -1,7 +1,7 @@
 const userModel = require("../models/userModel")
 
 const syncUser = async (clerkUserId, nombre, email) => {
-    const user = await userModel.findOne({ clerkUserId });
+    let user = await userModel.findOne({ clerkUserId });
     console.log("usuario encontrado:", user);
 
     if (!user) {

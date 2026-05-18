@@ -1,25 +1,38 @@
 const { createClerkClient } = require("@clerk/backend");
+const { verifyToken } = require("@clerk/backend");
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
 const requireAuth = async (req, res, next) => {
-    const token = req.headers.authorization;
+    /* const token = req.headers.authorization; */
+    const token = req.headers.authorization?.split(" ")[1];
+    /* console.log("header recibido:", req.headers.authorization); */
+    /* console.log("token recibido:", token); ver token*/
 
     if (!token) {
         return res.status(401).json({ error: 'Token requerido' })
     }
 
     try {
-        /* verifica el token con clerk */
-        const payload = await clerk.verifyToken(token);
+        /* valida el token con clerk (autentico, vigente y sin manipulacion) */
+        /* const payload = await clerk.verifyToken(token); */
+        const payload = await verifyToken(token, {
+            secretKey: process.env.CLERK_SECRET_KEY,
+        });
 
-        /* payload.sub contiene el clerkUserId, ej: "user_2abc123" */
-        /* payload es un objeto que contiene la info del usuario y sub
-        es un campo dentro que contiene el ID del usuario */
+        /* Con el clerkUserId buscamos los datos del usuario en Clerk */
+        const clerkUser = await clerk.users.getUser(payload.sub);
+
+        /* payload es un objeto que contiene info del usauario */
+        /* payload.sub contiene el ID de usuario de clerk*/
+        /* se adhunta todo al req para usarlo en el controller */
         req.clerkUserId = payload.sub;
+        req.nombre = clerkUser.firstName + " " + clerkUser.lastName;
+        req.email = clerkUser.emailAddresses[0].emailAddress;
         next();
 
-    } catch {
+    } catch (error) {
+        console.log("error de verificacion:", error.message);
         res.status(401).json({ error: "Token inválido" });
     }
 }

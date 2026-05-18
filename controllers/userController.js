@@ -2,8 +2,8 @@ const userService = require("../service/userService")
 
 const syncUser = async (req, res) => {
     try {
-        const { nombre, email } = req.body;
-        const { clerkUserId } = req;
+        const { clerkUserId, nombre, email } = req;
+        /* const { clerkUserId } = req; */
 
         const result = await userService.syncUser(clerkUserId, nombre, email);
 
