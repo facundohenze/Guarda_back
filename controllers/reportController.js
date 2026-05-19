@@ -3,7 +3,7 @@ const reportService = require("../service/reportService");
 const createReport = async (req, res) => {
     try {
         const clerkUserId = req.clerkUserId;
-        const { title, description, category, location, imageUrl } = req.body;
+        const { title, description, category, location, imageUrl, imageUrls } = req.body;
 
         if (!title || !description || !location?.lat || !location?.lng || !location?.address) {
             return res.status(400).json({ error: "Faltan campos obligatorios: title, description, location (lat, lng, address)" });
@@ -15,6 +15,7 @@ const createReport = async (req, res) => {
             category,
             location,
             imageUrl,
+            imageUrls,
         });
 
         return res.status(201).json(report);

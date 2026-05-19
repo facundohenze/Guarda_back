@@ -24,8 +24,8 @@ const reportSchema = new mongoose.Schema(
         /* categoría del incidente */
         category: {
             type: String,
-            enum: ["bache", "luminaria", "residuos", "inundacion", "vandalismo", "otro"],
-            default: "otro",
+            enum: ["Calles", "Alumbrado", "Higiene urbana", "Tránsito", "Espacios verdes", "Otro"],
+            default: "Otro",
         },
 
         /* prioridad asignada (puede ser manual o por IA más adelante) */
@@ -63,6 +63,12 @@ const reportSchema = new mongoose.Schema(
         imageUrl: {
             type: String,
             default: null,
+        },
+
+        /* URLs adicionales de imágenes/videos (opcional) */
+        imageUrls: {
+            type: [String],
+            default: [],
         },
     },
     {
