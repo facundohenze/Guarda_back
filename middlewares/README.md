@@ -6,7 +6,7 @@ Funciones que se ejecutan antes de que el request llegue al controlador.
   - Extrae el token de `Authorization: Bearer <token>`.
   - Verifica el token con Clerk.
   - Obtiene datos de usuario desde Clerk.
-  - Añade a `req`: `clerkUserId`, `nombre`, `email` y `user`.
+  - Añade a `req`: `clerkUserId`, `nombre` y `email`.
   - Devuelve 401 si el token no existe o no es válido.
 
 - `roles.js` — controla permisos según el rol local en MongoDB.

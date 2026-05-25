@@ -40,6 +40,19 @@ const getReportById = async (reportId) => {
     return report;
 };
 
+/* reportes del usuario logueado */
+const getReportsByUser = async (clerkUserId) => {
+    const user = await userModel.findOne({ clerkUserId });
+    if (!user) throw new Error("Usuario no encontrado en la base de datos");
+
+    const reports = await reportModel
+        .find({ userId: user._id })
+        .populate("userId", "nombre email role")
+        .sort({ createdAt: -1 });
+
+    return reports;
+};
+
 /* Actualiza el estado o prioridad de un reporte */
 const updateReport = async (reportId, clerkUserId, updates) => {
     const user = await userModel.findOne({ clerkUserId });
@@ -58,8 +71,17 @@ const updateReport = async (reportId, clerkUserId, updates) => {
 
     /* campos que se permiten actualizar por rol*/
     const allowedFields = isAdmin
-        ? ["title", "description", "category", "priority", "status", "imageUrl"] /* admins */
-        : ["title", "description", "category", "imageUrl"]; /* user */
+        ? ["title", "description", "category", "priority", "status", "imageUrl", "location"] /* admins */
+        : ["title", "description", "category", "imageUrl", "location"]; /* user */
+
+    /* verificar para actualizar ubicacion */
+    if (updates.location) {
+        const { lat, lng, address } = updates.location;
+        if (lat === undefined || lng === undefined || !address) {
+            throw new Error("location debe incluir lat, lng y address");
+        }
+    }
+
     allowedFields.forEach((field) => {
         if (updates[field] !== undefined) {
             report[field] = updates[field];
@@ -89,4 +111,4 @@ const deleteReport = async (reportId, clerkUserId) => {
     return { message: "Reporte eliminado correctamente" };
 };
 
-module.exports = { createReport, getAllReports, getReportById, updateReport, deleteReport };
+module.exports = { createReport, getAllReports, getReportById, updateReport, deleteReport, getReportsByUser };

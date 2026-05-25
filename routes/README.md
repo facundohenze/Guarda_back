@@ -29,8 +29,8 @@ Todas las rutas de reportes usan `requireAuth`.
 Rutas de usuario:
 - `GET /api/users` — listar todos los usuarios. Protegido con `requireRole('superadmin')`.
 - `GET /api/users/:id` — ver usuario por ID. Protegido con `requireRole('superadmin')`.
-- `PUT /api/users/:id` — editar un usuario. Requiere autenticación.
-- `DELETE /api/users/:id` — eliminar un usuario. Requiere autenticación.
+- `PUT /api/users/:id` — editar un usuario. Requiere autenticación. El controlador usa `req.user` para validar permisos si se aplica un middleware de rol.
+- `DELETE /api/users/:id` — eliminar un usuario. Requiere autenticación. El controlador usa `req.user` para validar permisos si se aplica un middleware de rol.
 
 ## Ejemplo de mapeo
 

@@ -7,8 +7,10 @@ const requireRole = require("../middlewares/roles");
 /* todas las rutas requieren autenticación */
 router.post("/", requireAuth, reportController.createReport); /* crear */
 router.get("/", requireAuth, requireRole("admin", "superadmin"), reportController.getAllReports); /* listar todos */
-router.get("/:id", requireAuth, reportController.getReportById); /* ver uno */
+router.get("/me", requireAuth, reportController.getMyReports); /* ver mis reportes */
+router.get("/:id", requireAuth, requireRole("admin", "superadmin"), reportController.getReportById); /* ver uno */
 router.put("/:id", requireAuth, reportController.updateReport); /* editar */
 router.delete("/:id", requireAuth, reportController.deleteReport); /* eliminar */
+
 
 module.exports = router;

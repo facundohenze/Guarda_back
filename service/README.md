@@ -24,8 +24,8 @@ Funciones principales:
 
 - `getUsersById(userId, reqUser)`
   - Busca un usuario por ID.
-  - Verifica permisos: owner o admin/superadmin.
-  - Devuelve el usuario o lanza error si no tiene acceso.
+  - Devuelve el usuario.
+  - El control de acceso para esta ruta se aplica en el router con `requireRole('superadmin')`.
 
 - `updateUser(targetUserId, reqUser, updates)`
   - Solo `superadmin` o el propio usuario pueden editar.

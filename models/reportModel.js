@@ -24,7 +24,7 @@ const reportSchema = new mongoose.Schema(
         /* categoría del incidente */
         category: {
             type: String,
-            enum: ["bache", "luminaria", "residuos", "inundacion", "vandalismo", "otro"],
+            enum: ["Calles", "Alumbrado", "`Higiene urbana`", "Tránsito", "`Espacios verdes`", "Otro"],
             default: "otro",
         },
 
@@ -38,8 +38,8 @@ const reportSchema = new mongoose.Schema(
         /* estado del ciclo de vida del reporte */
         status: {
             type: String,
-            enum: ["open", "in_progress", "resolved"],
-            default: "open",
+            enum: ["Pendiente", "En revisión", "Resuelto"],
+            default: "Pendiente",
         },
 
         /* ubicación geográfica */

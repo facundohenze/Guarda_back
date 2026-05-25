@@ -42,6 +42,16 @@ const getReportById = async (req, res) => {
     }
 };
 
+const getMyReports = async (req, res) => {
+    try {
+        const clerkUserId = req.clerkUserId;
+        const reports = await reportService.getReportsByUser(clerkUserId);
+        return res.status(200).json(reports);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
 const updateReport = async (req, res) => {
     try {
         const { id } = req.params;
@@ -69,4 +79,4 @@ const deleteReport = async (req, res) => {
     }
 };
 
-module.exports = { createReport, getAllReports, getReportById, updateReport, deleteReport };
+module.exports = { createReport, getAllReports, getReportById, updateReport, deleteReport, getMyReports };
