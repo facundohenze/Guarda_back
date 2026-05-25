@@ -1,6 +1,8 @@
 # Back_Guarda
 
-Backend de la aplicación Guarda, un servicio Node.js + Express que valida autenticación con Clerk, gestiona usuarios en MongoDB y expone APIs para sincronizar usuarios y CRUD de reportes.
+Backend de la aplicación Guarda con Node.js, Express, MongoDB y autenticación Clerk.
+
+Esta API valida usuarios con Clerk, sincroniza la sesión con una colección de usuarios en MongoDB y expone recursos para gestionar reportes y usuarios.
 
 ## Tecnologías
 
@@ -15,11 +17,11 @@ Backend de la aplicación Guarda, un servicio Node.js + Express que valida auten
 
 - `app.js` - punto de entrada del servidor
 - `config/mongo.js` - conexión a MongoDB
-- `routes/` - definición de rutas
-- `controllers/` - lógica de controladores de request
-- `service/` - lógica de negocio y acceso a datos
+- `routes/` - define los endpoints de la API
+- `controllers/` - recibe request/res y llama a servicios
+- `service/` - lógica de negocio y permisos
 - `models/` - esquemas de MongoDB
-- `middlewares/requireAuth.js` - verificación de token Clerk
+- `middlewares/` - autenticación y autorización
 
 ## Variables de entorno
 
@@ -48,30 +50,31 @@ node app.js
 
 El servidor quedará escuchando en el puerto definido en `PORT`.
 
-## Rutas disponibles
+## Rutas principales
 
-### Autenticación
+### Autenticación / sincronización
 
 #### POST `/api/auth/sync`
 
-Sincroniza el usuario autenticado con la base de datos.
+Sincroniza el usuario autenticado con la base de datos local.
 
 - Requiere cabecera `Authorization: Bearer <token>`
 - Verifica el token con Clerk.
-- Crea el usuario en MongoDB si no existe.
+- Recupera datos del usuario de Clerk y/o MongoDB.
+- Crea el usuario local si no existe.
 - Devuelve el rol del usuario.
 
-#### Request headers
+Request headers:
 
 ```http
 Authorization: Bearer <session_jwt>
 Content-Type: application/json
 ```
 
-#### Response
+Response ejemplo:
 
 ```json
-{ "role": "user" }
+{ "role": "citizen" }
 ```
 
 ### Reportes
@@ -100,25 +103,53 @@ Body JSON recomendado:
 
 #### GET `/api/reports`
 
-Lista todos los reportes.
+Lista todos los reportes. Se devuelve información del usuario creador en `userId`.
 
 #### GET `/api/reports/:id`
 
-Devuelve un reporte por id.
+Devuelve un reporte por su ID.
 
 #### PUT `/api/reports/:id`
 
-Actualiza un reporte. Se permiten los campos:
-- `title`
-- `description`
-- `category`
-- `priority`
-- `status`
-- `imageUrl`
+Actualiza un reporte.
+
+- Dueño del reporte puede editar `title`, `description`, `category`, `imageUrl`.
+- Admin/superadmin puede editar también `priority` y `status`.
 
 #### DELETE `/api/reports/:id`
 
-Elimina un reporte. Solo el creador o un admin pueden eliminarlo.
+Elimina un reporte.
+
+- Solo el creador o un admin pueden eliminarlo.
+
+### Usuarios
+
+#### GET `/api/users`
+
+Lista todos los usuarios.
+
+- Esta ruta está protegida a `superadmin`.
+
+#### GET `/api/users/:id`
+
+Devuelve datos de un usuario por ID.
+
+- Esta ruta está protegida para `superadmin`.
+- Solo un `superadmin` puede acceder a este endpoint.
+
+#### PUT `/api/users/:id`
+
+Edita un usuario.
+
+- Un usuario puede editar su propio `nombre`.
+- `superadmin` puede editar `nombre` y `role`.
+
+#### DELETE `/api/users/:id`
+
+Elimina un usuario.
+
+- Solo `superadmin` puede eliminar usuarios.
+- No se debe permitir eliminar el propio usuario si es superadmin.
 
 ## Modelos
 
@@ -127,33 +158,36 @@ Elimina un reporte. Solo el creador o un admin pueden eliminarlo.
 - `clerkUserId` (String, requerido, único)
 - `nombre` (String, requerido)
 - `email` (String, requerido, único)
-- `role` (`user` o `admin`, default `user`)
+- `role` (`citizen`, `admin`, `superadmin`, default `citizen`)
 
 ### Report
 
 - `userId` (ObjectId ref `User`)
-- `title` (String)
-- `description` (String)
+- `title` (String requerido)
+- `description` (String requerido)
 - `category` (`bache`, `luminaria`, `residuos`, `inundacion`, `vandalismo`, `otro`)
-- `priority` (`baja`, `media`, `alta`, `critica`)
-- `status` (`open`, `in_progress`, `resolved`)
-- `location` (lat, lng, address)
+- `priority` (`baja`, `media`, `alta`, `critica`, default `baja`)
+- `status` (`open`, `in_progress`, `resolved`, default `open`)
+- `location` (objeto con `lat`, `lng`, `address`)
 - `imageUrl` (String opcional)
+- `esPrincipal`, `reportePrincipalId`, `adhesiones`, `adheridos`
 
 ## Notas
 
-- El backend depende de Clerk para validar el JWT y obtener el usuario.
-- El middleware `requireAuth` extrae `clerkUserId`, `nombre` y `email` desde Clerk y los pasa al request.
+- El backend depende de Clerk para validar el JWT y obtener al usuario autenticado.
+- `requireAuth` valida el token y proporciona datos de la sesión.
+- `requireRole` controla permisos adicionales consultando el usuario local en MongoDB.
 
-## Sugerencia de uso
+## Uso recomendado
 
 1. Configura el frontend para usar la misma app Clerk.
-2. Regístrate en el frontend.
-3. El backend recibirá el token y sincronizará al usuario en MongoDB.
+2. Autentica el usuario y obtén el JWT.
+3. Llama a `/api/auth/sync` para asegurar que el usuario exista en MongoDB.
+4. Usa las rutas de reportes y usuarios con el token en el header.
 
-## Manejar token manualmente(sino lo manda el front)
+## Token manual
 
-1. Registrarse o inciar sesion en el front
-2. En la consola del navegador escribir await window.Clerk.session.getToken() y te dara el token
-3. En Postman o Bruno -> Authorization, Type: Bearer Token y pegar token
-4. Eso iria en las rutas que requieren del token
+1. Inicia sesión en el frontend.
+2. En la consola del navegador, ejecuta `await window.Clerk.session.getToken()`.
+3. Usa ese token como `Bearer <token>` en Postman o Insomnia.
+

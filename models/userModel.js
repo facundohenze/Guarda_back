@@ -18,12 +18,12 @@ const userSchema = new mongoose.Schema(
             required: true,
             unique: true,
         },
-        /* por defecto los nuevos usuarios son user */
+        /* por defecto los nuevos usuarios son citizen=ciudadano */
         /* se puede cambiar desde la BD */
         role: {
             type: String,
-            enum: ["user", "admin"],
-            default: "user",
+            enum: ["citizen", "admin", "superadmin"],
+            default: "citizen",
         },
     },
     {
@@ -32,4 +32,4 @@ const userSchema = new mongoose.Schema(
     }
 );
 
-module.exports = mongoose.model("User", userSchema);
+module.exports = mongoose.model("User", userSchema); 

@@ -2,9 +2,27 @@
 
 Funciones que se ejecutan antes de que el request llegue al controlador.
 
-- `authMiddleware.js` — verifica el token JWT de Clerk. Si el token
-  no es válido o no existe, rechaza el request con 401.
-- `roleMiddleware.js` — verifica el rol del usuario dentro del token.
-  Si el rol no tiene permiso para esa ruta, rechaza con 403.
+- `requireAuth.js` — valida el token JWT con Clerk.
+  - Extrae el token de `Authorization: Bearer <token>`.
+  - Verifica el token con Clerk.
+  - Obtiene datos de usuario desde Clerk.
+  - Añade a `req`: `clerkUserId`, `nombre`, `email` y `user`.
+  - Devuelve 401 si el token no existe o no es válido.
 
-El orden importa: primero se verifica identidad (auth), después permisos (role).
+- `roles.js` — controla permisos según el rol local en MongoDB.
+  - Busca al usuario local por `req.clerkUserId`.
+  - Comprueba si su `role` está entre los permitidos.
+  - Adjunta el usuario local como `req.user`.
+  - Devuelve 403 si el rol no tiene permiso.
+
+## Orden recomendado
+
+1. `requireAuth` para validar identidad.
+2. `requireRole(...)` para permisos específicos.
+
+## Ejemplo de uso
+
+- `router.get('/api/reports', requireAuth, reportController.getAllReports)`
+- `router.get('/api/users', requireAuth, requireRole('superadmin'), userController.getAllUsers)`
+
+El middleware asegura que el request tenga identidad y, si corresponde, el rol necesario.

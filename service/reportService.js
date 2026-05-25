@@ -48,16 +48,18 @@ const updateReport = async (reportId, clerkUserId, updates) => {
     const report = await reportModel.findById(reportId);
     if (!report) throw new Error("Reporte no encontrado");
 
-    /* solo el dueño o un admin pueden editar */
+    /* solo el dueño del reporte o un admin pueden editar */
     const isOwner = report.userId.toString() === user._id.toString();
-    const isAdmin = user.role === "admin";
+    const isAdmin = user.role === "admin" || user.role === "superadmin";
 
     if (!isOwner && !isAdmin) {
         throw new Error("No tenés permisos para editar este reporte");
     }
 
-    /* campos que se permiten actualizar */
-    const allowedFields = ["title", "description", "category", "priority", "status", "imageUrl"];
+    /* campos que se permiten actualizar por rol*/
+    const allowedFields = isAdmin
+        ? ["title", "description", "category", "priority", "status", "imageUrl"] /* admins */
+        : ["title", "description", "category", "imageUrl"]; /* user */
     allowedFields.forEach((field) => {
         if (updates[field] !== undefined) {
             report[field] = updates[field];

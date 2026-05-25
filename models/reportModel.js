@@ -32,7 +32,7 @@ const reportSchema = new mongoose.Schema(
         priority: {
             type: String,
             enum: ["baja", "media", "alta", "critica"],
-            default: "media",
+            default: "baja",
         },
 
         /* estado del ciclo de vida del reporte */
@@ -64,7 +64,65 @@ const reportSchema = new mongoose.Schema(
             type: String,
             default: null,
         },
+
+        /* ----------------------------------------------------------------- */
+
+
+        /* SISTEMA DE ADHESIONES */
+
+        // true si es el reporte original, false si es adherido
+        esPrincipal: {
+            type: Boolean,
+            default: true,
+        },
+
+        // referencia al reporte principal (solo para reportes adheridos)
+        reportePrincipalId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Report",
+            default: null,
+        },
+
+        // cantidad de adhesiones (para calcular prioridad)
+        adhesiones: {
+            type: Number,
+            default: 0,
+        },
+
+        // array de usuarios que se adhirieron y su reporte adherido
+        adheridos: [
+            {
+                userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+                reporteId: { type: mongoose.Schema.Types.ObjectId, ref: "Report" },
+            },
+        ],
+
+        /* ----------------------------------------------------------------- */
+        /* ANALISIS DE LA IA */
+
+        /*  aiAnalysis: {
+             severidad: {
+                 type: String,
+                 enum: ["leve", "moderado", "critico"],
+                 default: null,
+             },
+             etiquetas: {
+                 type: [String],
+                 default: [],
+             },
+             resumen: {
+                 type: String,
+                 default: null,
+             },
+         }, */
+
     },
+
+
+
+
+
+
     {
         timestamps: true,
     }
