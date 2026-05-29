@@ -15,20 +15,15 @@ const requireAuth = async (req, res, next) => {
 
     try {
         /* valida el token con clerk (autentico, vigente y sin manipulacion) */
-        /* const payload = await clerk.verifyToken(token); */
+        /* devuelve datos basicos de la sesion, incluido el clerkUserId */
         const payload = await verifyToken(token, {
             secretKey: process.env.CLERK_SECRET_KEY,
         });
 
-        /* Con el clerkUserId buscamos los datos del usuario en Clerk */
-        const clerkUser = await clerk.users.getUser(payload.sub);
-
-        /* payload es un objeto que contiene info del usauario */
-        /* payload.sub contiene el ID de usuario de clerk*/
+        /* payload.sub accedes al clerkUserId*/
         /* se adhunta todo al req para usarlo en el controller */
         req.clerkUserId = payload.sub;
-        req.nombre = clerkUser.firstName + " " + clerkUser.lastName;
-        req.email = clerkUser.emailAddresses[0].emailAddress;
+
         next();
 
     } catch (error) {

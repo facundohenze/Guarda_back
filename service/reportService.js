@@ -87,8 +87,15 @@ const updateReport = async (reportId, clerkUserId, updates) => {
             report[field] = updates[field];
         }
     });
-
-    await report.save();
+    /* console.log("report antes de save:", report)
+    await report.save(); */
+    try {
+        await report.save();
+        console.log("save exitoso")
+    } catch (err) {
+        console.log("error en save:", err.message)
+        throw err
+    }
     return report;
 };
 

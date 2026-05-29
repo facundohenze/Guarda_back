@@ -38,8 +38,8 @@ const reportSchema = new mongoose.Schema(
         /* estado del ciclo de vida del reporte */
         status: {
             type: String,
-            enum: ["Pendiente", "En revisión", "Resuelto"],
-            default: "Pendiente",
+            enum: ["open", "in_progress", "resolved"],
+            default: "open",
         },
 
         /* ubicación geográfica */
