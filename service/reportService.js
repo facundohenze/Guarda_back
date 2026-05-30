@@ -2,7 +2,7 @@ const reportModel = require("../models/reportModel");
 const userModel = require("../models/userModel");
 
 /* Crea un nuevo reporte */
-const createReport = async (clerkUserId, { title, description, category, location, imageUrl }) => {
+const createReport = async (clerkUserId, { title, description, category, location, imageUrls }) => {
     /* buscamos el usuario en nuestra BD con el clerkUserId */
     const user = await userModel.findOne({ clerkUserId });
     if (!user) throw new Error("Usuario no encontrado en la base de datos");
@@ -13,7 +13,7 @@ const createReport = async (clerkUserId, { title, description, category, locatio
         description,
         category: category || "otro",
         location,
-        imageUrl: imageUrl || null,
+        imageUrls: imageUrls || [],
     });
 
     return report;

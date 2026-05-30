@@ -25,7 +25,20 @@ const userSchema = new mongoose.Schema(
             enum: ["citizen", "admin", "superadmin"],
             default: "citizen",
         },
+        /* soft delete — no se elimina el documento, se desactiva */
+        isActive: {
+            type: Boolean,
+            default: true,
+        },
+        deletedAt: {
+            type: Date,
+            default: null,
+        },
+
     },
+
+
+
     {
         /* fecha automatica */
         timestamps: true,

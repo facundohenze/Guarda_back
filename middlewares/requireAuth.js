@@ -1,5 +1,6 @@
 const { createClerkClient } = require("@clerk/backend");
 const { verifyToken } = require("@clerk/backend");
+const userModel = require("../models/userModel");
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
@@ -23,6 +24,12 @@ const requireAuth = async (req, res, next) => {
         /* payload.sub accedes al clerkUserId*/
         /* se adhunta todo al req para usarlo en el controller */
         req.clerkUserId = payload.sub;
+
+        /* verificamos que el usuario esté activo en nuestra BD */
+        const user = await userModel.findOne({ clerkUserId: payload.sub });
+        if (user && !user.isActive) {
+            return res.status(403).json({ error: "Cuenta desactivada" });
+        }
 
         next();
 

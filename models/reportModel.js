@@ -24,7 +24,7 @@ const reportSchema = new mongoose.Schema(
         /* categoría del incidente */
         category: {
             type: String,
-            enum: ["Calles", "Alumbrado", "`Higiene urbana`", "Tránsito", "`Espacios verdes`", "Otro"],
+            enum: ["Calles", "Alumbrado", "Higiene urbana", "Tránsito", "Espacios verdes", "Otro"],
             default: "otro",
         },
 
@@ -60,9 +60,9 @@ const reportSchema = new mongoose.Schema(
         },
 
         /* URL de imagen subida a Cloudinary (opcional) */
-        imageUrl: {
-            type: String,
-            default: null,
+        imageUrls: {
+            type: [String],
+            default: [],
         },
 
         /* ----------------------------------------------------------------- */

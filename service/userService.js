@@ -61,7 +61,7 @@ const updateUser = async (targetUserId, reqUser, updates) => {
 
     // campos permitidos según rol
     const allowedFields = isSuperAdmin
-        ? ["nombre", "role"] /* admins */
+        ? ["nombre", "role", "isActive"] /* admins */
         : ["nombre"]; /* user */
 
     allowedFields.forEach((field) => {
@@ -69,6 +69,16 @@ const updateUser = async (targetUserId, reqUser, updates) => {
             targetUser[field] = updates[field];
         }
     });
+
+    /* si se reactiva, limpiar deletedAt y desbanear en Clerk */
+    if (updates.isActive === true) {
+        targetUser.deletedAt = null;
+        try {
+            await clerk.users.unbanUser(targetUser.clerkUserId);
+        } catch (err) {
+            console.log("Error al desbanear en Clerk:", err.message)
+        }
+    }
 
     await targetUser.save();
     return targetUser;
@@ -88,17 +98,21 @@ const deleteUser = async (userId, reqUser) => {
         throw new Error("No podés eliminar tu propio usuario");
     }
 
-    await userModel.findByIdAndDelete(userId);
-    return { message: "Usuario eliminado correctamente" };
+    /* soft delete — cambia el estado */
+    user.isActive = false;
+    user.deletedAt = new Date();
+    await user.save();
+
+    /* banear en Clerk — no puede loguear pero el usuario sigue existiendo */
+    try {
+        await clerk.users.banUser(user.clerkUserId);
+    } catch (err) {
+        console.log("Error al banear en Clerk:", err.message)
+    }
+
+    return { message: "Usuario desactivado  correctamente" };
 
 }
-
-
-
-
-
-
-
 
 module.exports = { syncUser, getAllUsers, getUsersById, updateUser, deleteUser };
 
