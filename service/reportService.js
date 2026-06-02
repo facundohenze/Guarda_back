@@ -33,7 +33,8 @@ const getAllReports = async () => {
 const getReportById = async (reportId) => {
     const report = await reportModel
         .findById(reportId)
-        .populate("userId", "nombre email role");
+        .populate("userId", "nombre email role")
+        .sort({ createdAt: -1 });
 
     if (!report) throw new Error("Reporte no encontrado");
 
