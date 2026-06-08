@@ -6,6 +6,7 @@ const connectDB = require("./config/mongo");
 const authRoutes = require("./routes/authRoutes")
 const reportRoutes = require("./routes/reportRoutes")
 const userRoutes = require("./routes/userRoutes")
+const publicRoutes = require("./routes/publicRoutes");
 
 app.use(cors())
 connectDB(); /* se conecta al arrancar el servidor */
@@ -18,7 +19,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/users", userRoutes);
 
-
+/* scope publico */
+app.use("/api/public", publicRoutes);
 
 
 
