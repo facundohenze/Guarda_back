@@ -100,21 +100,21 @@ const reportSchema = new mongoose.Schema(
         /* ----------------------------------------------------------------- */
         /* ANALISIS DE LA IA */
 
-        /*  aiAnalysis: {
-             severidad: {
-                 type: String,
-                 enum: ["leve", "moderado", "critico"],
-                 default: null,
-             },
-             etiquetas: {
-                 type: [String],
-                 default: [],
-             },
-             resumen: {
-                 type: String,
-                 default: null,
-             },
-         }, */
+        aiAnalysis: {
+            severidad: {
+                type: String,
+                enum: ["baja", "media", "alta", "critica"],
+                default: null,
+            },
+            etiquetas: {
+                type: [String],
+                default: [],
+            },
+            resumen: {
+                type: String,
+                default: null,
+            },
+        },
 
     },
 
