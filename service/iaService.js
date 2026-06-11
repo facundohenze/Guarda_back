@@ -1,8 +1,17 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenAI } = require("@google/genai");
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+const generateContent = (prompt) => genAI.models.generateContent({
+    model: "gemini-2.5-flash-lite",
+    contents: prompt,
+    config: { temperature: 0.1 },
+});
+
+const parseJSON = (text) => {
+    const match = text.match(/\{[\s\S]*\}/);
+    return JSON.parse(match ? match[0] : text);
+};
 /* Analiza un reporte nuevo y devuelve severidad, etiquetas y resumen */
 const analyzeReport = async (title, description, category) => {
     const prompt = `
@@ -22,16 +31,33 @@ Devolvé exactamente este formato JSON:
 }
 
 Criterios de severidad:
-- critica: riesgo inmediato para personas (semáforo apagado, poste caído, inundación grave)
-- alta: problema importante que afecta la circulación o servicios básicos
-- media: problema visible que requiere atención pronta
-- baja: problema menor o estético
+- critica: riesgo inmediato para personas (accidente de tránsito, choque de vehículos, heridos, semáforo apagado en cruce, poste caído, inundación grave, incendio, gas, etc)
+- alta: problema importante que afecta la circulación o servicios básicos (bache profundo en arteria principal, árbol caído en la vía, corte de luz en zona amplia, pérdida de agua, etc)
+- media: problema visible que requiere atención pronta (bache en calle secundaria, luminaria apagada, basura acumulada, grafitis en edificio público, etc)
+- baja: problema menor o estético (vereda levantada sin riesgo, pintura deteriorada, pasto alto, etc)
 `;
 
     try {
-        const result = await model.generateContent(prompt);
-        const text = result.response.text().trim();
-        const parsed = JSON.parse(text);
+        const result = await generateContent(prompt);
+        const parsed = parseJSON(result.text);
+        const validPriorities = [
+            "baja",
+            "media",
+            "alta",
+            "critica"
+        ];
+
+        if (!validPriorities.includes(parsed.severidad)) {
+            parsed.severidad = "media";
+        }
+
+        if (!Array.isArray(parsed.etiquetas)) {
+            parsed.etiquetas = [];
+        }
+
+        if (typeof parsed.resumen !== "string") {
+            parsed.resumen = "";
+        }
         return parsed;
     } catch (err) {
         console.warn("[iaService] analyzeReport falló, usando valores por defecto:", err.message);
@@ -42,7 +68,14 @@ Criterios de severidad:
 /* Analiza reportes cercanos y detecta duplicados y similares */
 const analyzeSimilarReports = async (newReport, nearbyReports) => {
     if (nearbyReports.length === 0) return { duplicado: null, similares: [] };
-
+    const reportsToAnalyze = nearbyReports
+        .slice(0, 10)
+        .map(r => ({
+            id: r._id,
+            title: r.title,
+            description: r.description,
+            category: r.category
+        }));
     const prompt = `
 Sos un asistente municipal que analiza reportes de incidentes urbanos.
 Se está creando un reporte nuevo y hay reportes cercanos en la zona.
@@ -77,14 +110,34 @@ Criterios:
 `;
 
     try {
-        const result = await model.generateContent(prompt);
-        const text = result.response.text().trim();
-        const parsed = JSON.parse(text);
+        const result = await generateContent(prompt);
+        const parsed = parseJSON(result.text);
         return parsed;
     } catch (err) {
-        console.warn("[iaService] analyzeSimilarReports falló, usando valores por defecto:", err.message);
-        return { duplicado: null, similares: [] };
+        console.warn("[iaService] analyzeSimilarReports falló, usando detección rule-based:", err.message);
+        return detectDuplicatesRuleBased(newReport, nearbyReports);
     }
+};
+
+/* Fallback sin IA: mismo usuario + misma categoría en la zona = duplicado */
+const detectDuplicatesRuleBased = (newReport, nearbyReports) => {
+    const duplicadoReport = nearbyReports.find(r =>
+        r.userId._id.toString() === newReport.userId.toString() &&
+        r.title.toLowerCase() === newReport.title.toLowerCase() &&
+        r.category === newReport.category
+    );
+
+    const similares = nearbyReports
+        .filter(r =>
+            r.category === newReport.category &&
+            (!duplicadoReport || r._id.toString() !== duplicadoReport._id.toString())
+        )
+        .map(r => r._id.toString());
+
+    return {
+        duplicado: duplicadoReport ? duplicadoReport._id.toString() : null,
+        similares,
+    };
 };
 
 module.exports = { analyzeReport, analyzeSimilarReports };

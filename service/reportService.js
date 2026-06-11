@@ -7,8 +7,9 @@ const createReport = async (clerkUserId, { title, description, category, locatio
     const user = await userModel.findOne({ clerkUserId });
     if (!user) throw new Error("Usuario no encontrado en la base de datos");
 
-    // 1. buscamos reportes cercanos en un radio de 500 metros
-    const nearbyReports = await getNearbyReports(location.lat, location.lng, 500);
+    // 1. buscamos reportes cercanos en un radio de 50 metros
+    const nearbyReports = await getNearbyReports(location.lat, location.lng, 50);
+    console.log("[DEBUG] nearbyReports encontrados:", nearbyReports.length, nearbyReports.map(r => ({ id: r._id, title: r.title, userId: r.userId })));
 
     // 2. mandamos a la IA los reportes cercanos + el nuevo para detectar duplicados y similares
     const { duplicado, similares } = await analyzeSimilarReports(
@@ -25,6 +26,7 @@ const createReport = async (clerkUserId, { title, description, category, locatio
         };
     }
 
+    /* SI ES ORIGINAL  */
     // 4. analizamos el reporte con IA para obtener severidad, etiquetas y resumen
     const aiAnalysis = await analyzeReport(title, description, category);
 
@@ -158,7 +160,7 @@ const deleteReport = async (reportId, clerkUserId) => {
 
 
 /* Devuelve reportes pendientes en un radio dado (en metros) */
-const getNearbyReports = async (lat, lng, radius = 500) => {
+const getNearbyReports = async (lat, lng, radius = 50) => {
     // convertimos el radio de metros a grados aproximados
     // 1 grado ≈ 111km, entonces 1 metro ≈ 0.000009 grados
     const radiusInDegrees = radius / 111000;
