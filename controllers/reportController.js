@@ -3,7 +3,7 @@ const reportService = require("../service/reportService");
 const createReport = async (req, res) => {
     try {
         const clerkUserId = req.clerkUserId;
-        const { title, description, category, location, imageUrls } = req.body;
+        const { title, description, category, location, imageUrls, forzarCreacion } = req.body;
 
         if (!title || !description || !location?.lat || !location?.lng || !location?.address) {
             return res.status(400).json({ error: "Faltan campos obligatorios: title, description, location (lat, lng, address)" });
@@ -15,15 +15,11 @@ const createReport = async (req, res) => {
             category,
             location,
             imageUrls,
+            forzarCreacion,
         });
 
-        // si es duplicado devolvemos 409 (conflicto)
-        if (result.esDuplicado) {
-            return res.status(409).json(result);
-        }
-
-        // si hay similares devolvemos 200 con el reporte y los similares
-        // el front decide si el usuario quiere adherirse o no
+        if (result.esDuplicado) return res.status(409).json(result);
+        if (result.pendiente) return res.status(200).json(result);
         return res.status(201).json(result);
 
     } catch (error) {
