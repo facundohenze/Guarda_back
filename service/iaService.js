@@ -71,10 +71,11 @@ const analyzeSimilarReports = async (newReport, nearbyReports) => {
     const reportsToAnalyze = nearbyReports
         .slice(0, 10)
         .map(r => ({
-            id: r._id,
+            id: r._id.toString(),
             title: r.title,
             description: r.description,
-            category: r.category
+            category: r.category,
+            userId: r.userId._id?.toString() || r.userId.toString(),
         }));
     const prompt = `
 Sos un asistente municipal que analiza reportes de incidentes urbanos.
@@ -86,14 +87,15 @@ Reporte nuevo:
 - Título: ${newReport.title}
 - Descripción: ${newReport.description}
 - Categoría: ${newReport.category}
+- UsuarioId: ${newReport.userId.toString()}
 
 Reportes cercanos:
-${nearbyReports.map((r, i) => `
-[${i}] ID: ${r._id}
+${reportsToAnalyze.map((r, i) => `
+[${i}] ID: ${r.id}
 - Título: ${r.title}
 - Descripción: ${r.description}
 - Categoría: ${r.category}
-- Usuario: ${r.userId}
+- UsuarioId: ${r.userId}
 `).join('\n')}
 
 Devolvé exactamente este formato JSON:
@@ -103,7 +105,7 @@ Devolvé exactamente este formato JSON:
 }
 
 Criterios:
-- duplicado: mismo incidente, mismo usuario, misma categoría y descripción muy similar
+- duplicado: incidente similar, mismo usuario, misma categoría o similar, descripción y título similar
 - similares: mismo tipo de incidente en la zona aunque sea de otro usuario (no incluir el duplicado)
 - Si no hay duplicado, "duplicado" debe ser null
 - Si no hay similares, "similares" debe ser array vacío
@@ -140,4 +142,35 @@ const detectDuplicatesRuleBased = (newReport, nearbyReports) => {
     };
 };
 
-module.exports = { analyzeReport, analyzeSimilarReports };
+/* Normaliza título y descripción: corrige ortografía, gramática y redacción */
+const normalizeReport = async (title, description) => {
+    const prompt = `
+Sos un asistente que corrige reportes ciudadanos en español rioplatense.
+Corregí la ortografía, gramática y redacción del título y la descripción.
+No cambies el significado ni agregues información que no esté.
+Devolvé ÚNICAMENTE un JSON válido, sin texto adicional, sin bloques de código.
+
+Título original: ${title}
+Descripción original: ${description}
+
+Devolvé exactamente este formato JSON:
+{
+  "title": "título corregido",
+  "description": "descripción corregida"
+}
+`;
+
+    try {
+        const result = await generateContent(prompt);
+        const parsed = parseJSON(result.text);
+        if (typeof parsed.title !== "string" || typeof parsed.description !== "string") {
+            throw new Error("Formato inválido");
+        }
+        return parsed;
+    } catch (err) {
+        console.warn("[iaService] normalizeReport falló, usando valores originales:", err.message);
+        return { title, description };
+    }
+};
+
+module.exports = { normalizeReport, analyzeReport, analyzeSimilarReports };

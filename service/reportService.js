@@ -1,23 +1,27 @@
 const reportModel = require("../models/reportModel");
 const userModel = require("../models/userModel");
-const { analyzeReport, analyzeSimilarReports } = require("./iaService");
+const { normalizeReport, analyzeReport, analyzeSimilarReports } = require("./iaService");
 
 /* Crea un nuevo reporte */
 const createReport = async (clerkUserId, { title, description, category, location, imageUrls }) => {
     const user = await userModel.findOne({ clerkUserId });
     if (!user) throw new Error("Usuario no encontrado en la base de datos");
 
-    // 1. buscamos reportes cercanos en un radio de 50 metros
+    // 1. normalizamos título y descripción antes de cualquier análisis
+    ({ title, description } = await normalizeReport(title, description));
+
+    // 2. buscamos reportes cercanos en un radio de 50 metros
     const nearbyReports = await getNearbyReports(location.lat, location.lng, 50);
     console.log("[DEBUG] nearbyReports encontrados:", nearbyReports.length, nearbyReports.map(r => ({ id: r._id, title: r.title, userId: r.userId })));
 
-    // 2. mandamos a la IA los reportes cercanos + el nuevo para detectar duplicados y similares
+    // 3. mandamos a la IA los reportes cercanos + el nuevo para detectar duplicados y similares
     const { duplicado, similares } = await analyzeSimilarReports(
-        { title, description, category, userId: user._id },
-        nearbyReports
+        { title, description, category, userId: user._id }, /* nuevo */
+        nearbyReports /* similares */
     );
 
-    // 3. si hay duplicado del mismo usuario, avisamos sin guardar
+    /* SI ES DUPLICADO */
+    // 4. si hay duplicado del mismo usuario, avisamos sin guardar
     if (duplicado) {
         return {
             esDuplicado: true,
@@ -26,11 +30,11 @@ const createReport = async (clerkUserId, { title, description, category, locatio
         };
     }
 
-    /* SI ES ORIGINAL  */
-    // 4. analizamos el reporte con IA para obtener severidad, etiquetas y resumen
+    /* SI ES ORIGINAL */
+    // 5. analizamos el reporte con IA para obtener severidad, etiquetas y resumen
     const aiAnalysis = await analyzeReport(title, description, category);
 
-    // 5. guardamos el reporte con el análisis de IA
+    // 6. guardamos el reporte con el análisis de IA
     const report = await reportModel.create({
         userId: user._id,
         title,
@@ -43,7 +47,8 @@ const createReport = async (clerkUserId, { title, description, category, locatio
         esPrincipal: true,
     });
 
-    // 6. si hay similares los devolvemos junto al reporte creado
+    /* SI HAY SIMILARES */
+    // 7. si hay similares los devolvemos junto al reporte creado
     // para que el front le muestre al usuario la opción de adherirse
     const reportesSimilares = similares.length > 0
         ? nearbyReports.filter((r) => similares.includes(r._id.toString()))
@@ -181,7 +186,7 @@ const getNearbyReports = async (lat, lng, radius = 50) => {
 
 
 /* Adhiere un usuario a un reporte existente */
-const adherirReporte = async (clerkUserId, reportePrincipalId) => {
+const adherirReporte = async (clerkUserId, reportePrincipalId, { title, description, imageUrls } = {}) => {
     const user = await userModel.findOne({ clerkUserId });
     if (!user) throw new Error("Usuario no encontrado");
 
@@ -198,8 +203,9 @@ const adherirReporte = async (clerkUserId, reportePrincipalId) => {
     // creamos el reporte adherido del usuario
     const reporteAdherido = await reportModel.create({
         userId: user._id,
-        title: reportePrincipal.title,
-        description: reportePrincipal.description,
+        title: title || reportePrincipal.title,
+        description: description || reportePrincipal.description,
+        imageUrls: imageUrls || [],
         category: reportePrincipal.category,
         location: reportePrincipal.location,
         status: reportePrincipal.status,

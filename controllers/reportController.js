@@ -119,8 +119,9 @@ const adherirReporte = async (req, res) => {
     try {
         const clerkUserId = req.clerkUserId;
         const { id } = req.params;
+        const { title, description, imageUrls } = req.body;
 
-        const result = await reportService.adherirReporte(clerkUserId, id);
+        const result = await reportService.adherirReporte(clerkUserId, id, { title, description, imageUrls });
         return res.status(201).json(result);
     } catch (error) {
         const status = error.message.includes("ya estás") ? 409 : 500;
