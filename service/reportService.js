@@ -31,7 +31,10 @@ const createReport = async (clerkUserId, { title, description, category, locatio
 
         // 5. si hay similares, devolvemos sin guardar para que el usuario decida
         if (similares.length > 0) {
-            const reportesSimilares = nearbyReports.filter((r) => similares.includes(r._id.toString()));
+            const similaresTrimmed = similares.map(id => String(id).trim());
+            let reportesSimilares = nearbyReports.filter((r) => similaresTrimmed.includes(r._id.toString()));
+            // fallback: si el filtro falla por IDs mal formateados, mostramos todos los cercanos
+            if (reportesSimilares.length === 0) reportesSimilares = [...nearbyReports];
             return {
                 pendiente: true,
                 similares: reportesSimilares,
@@ -63,10 +66,10 @@ const createReport = async (clerkUserId, { title, description, category, locatio
     };
 };
 
-/* Devuelve todos los reportes (con datos del usuario que lo creó) */
+/* Devuelve todos los reportes principales (con datos del usuario que lo creó) */
 const getAllReports = async () => {
     const reports = await reportModel
-        .find()
+        .find({ esPrincipal: true })
         .populate("userId", "nombre email role")
         .sort({ createdAt: -1 });
 
