@@ -91,7 +91,7 @@ const getReportById = async (reportId) => {
 /* reportes del usuario logueado */
 const getReportsByUser = async (clerkUserId) => {
     const user = await userModel.findOne({ clerkUserId });
-    if (!user) throw new Error("Usuario no encontrado en la base de datos");
+    if (!user) return [];
 
     const reports = await reportModel
         .find({ userId: user._id })
