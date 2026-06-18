@@ -12,7 +12,29 @@ const parseJSON = (text) => {
     const match = text.match(/\{[\s\S]*\}/);
     return JSON.parse(match ? match[0] : text);
 };
-/* Analiza un reporte nuevo y devuelve severidad, etiquetas y resumen */
+
+/* Reintentos con backoff exponencial — solo para errores de sobrecarga (503) */
+const withRetry = async (fn, { retries = 4, baseDelay = 1000, label = 'ia' } = {}) => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            return await fn();
+        } catch (err) {
+            const isOverloaded =
+                err?.status === 503 ||
+                String(err?.message).includes('503') ||
+                String(err?.message).toLowerCase().includes('overload');
+
+            if (!isOverloaded || attempt === retries) throw err;
+
+            const delay = baseDelay * Math.pow(2, attempt);
+            console.warn(`[iaService:${label}] Intento ${attempt + 1} fallido (sobrecarga), reintentando en ${delay}ms…`);
+            await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+    }
+};
+/* Analiza un reporte nuevo y devuelve severidad, etiquetas y resumen.
+   Reintenta hasta 4 veces con backoff exponencial si Gemini está saturado.
+   Si todos los reintentos fallan, propaga el error (el reporte NO se crea). */
 const analyzeReport = async (title, description, category) => {
     const prompt = `
 Sos un asistente municipal que analiza reportes de incidentes urbanos en Villa María, Argentina.
@@ -37,31 +59,22 @@ Criterios de severidad:
 - baja: problema menor o estético (vereda levantada sin riesgo, pintura deteriorada, pasto alto, etc)
 `;
 
-    try {
+    const run = async () => {
         const result = await generateContent(prompt);
         const parsed = parseJSON(result.text);
-        const validPriorities = [
-            "baja",
-            "media",
-            "alta",
-            "critica"
-        ];
 
-        if (!validPriorities.includes(parsed.severidad)) {
-            parsed.severidad = "media";
-        }
+        if (!["baja", "media", "alta", "critica"].includes(parsed.severidad)) parsed.severidad = "media";
+        if (!Array.isArray(parsed.etiquetas)) parsed.etiquetas = [];
+        if (typeof parsed.resumen !== "string") parsed.resumen = "";
 
-        if (!Array.isArray(parsed.etiquetas)) {
-            parsed.etiquetas = [];
-        }
-
-        if (typeof parsed.resumen !== "string") {
-            parsed.resumen = "";
-        }
         return parsed;
+    };
+
+    try {
+        return await withRetry(run, { retries: 4, baseDelay: 1000, label: 'analyzeReport' });
     } catch (err) {
-        console.warn("[iaService] analyzeReport falló, usando valores por defecto:", err.message);
-        return { severidad: "media", etiquetas: [], resumen: "" };
+        console.error("[iaService] analyzeReport agotó todos los reintentos:", err.message);
+        throw new Error("El análisis de IA no está disponible en este momento. Por favor intentá de nuevo en unos segundos.");
     }
 };
 
