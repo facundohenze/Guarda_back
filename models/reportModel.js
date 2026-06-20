@@ -57,6 +57,11 @@ const reportSchema = new mongoose.Schema(
                 required: true,
                 trim: true,
             },
+            barrio: {
+                type: String,
+                trim: true,
+                default: null,
+            },
         },
 
         /* URL de imagen subida a Cloudinary (opcional) */
