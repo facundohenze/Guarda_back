@@ -10,6 +10,7 @@ router.get("/", requireAuth, requireRole("admin", "superadmin"), reportControlle
 router.get("/me", requireAuth, reportController.getMyReports); /* ver mis reportes */
 router.get("/nearby", requireAuth, reportController.getNearbyReports); /* reportes pendientes en un radio x */
 router.post("/:id/adherir", requireAuth, reportController.adherirReporte); /* crear reporte adherido */
+router.get("/:id/historial", requireAuth, reportController.getReportHistorial); /* historial de estados */
 router.get("/:id", requireAuth, requireRole("admin", "superadmin"), reportController.getReportById); /* ver uno */
 router.put("/:id", requireAuth, reportController.updateReport); /* editar */
 router.delete("/:id", requireAuth, reportController.deleteReport); /* eliminar */

@@ -1,6 +1,7 @@
 const reportModel = require("../models/reportModel");
 const userModel = require("../models/userModel");
 const { normalizeReport, analyzeReport, analyzeSimilarReports } = require("./iaService");
+const ReportStatusHistory = require("../models/reportStatusHistoryModel");
 
 /* Crea un nuevo reporte */
 const createReport = async (clerkUserId, { title, description, category, location, imageUrls, forzarCreacion }) => {
@@ -127,6 +128,10 @@ const updateReport = async (reportId, clerkUserId, updates) => {
         }
     }
 
+    // capturamos el estado ANTES de pisarlo, solo lo necesitamos si va a cambiar
+    const estadoAnterior = report.status;
+    const cambioEstado = isAdmin && updates.status && updates.status !== estadoAnterior;
+
     allowedFields.forEach((field) => {
         if (updates[field] !== undefined) {
             report[field] = updates[field];
@@ -135,17 +140,57 @@ const updateReport = async (reportId, clerkUserId, updates) => {
 
     await report.save();
 
+    // si hubo cambio real de estado, registramos el historial del principal
+    if (cambioEstado) {
+        await ReportStatusHistory.create({
+            reportId: report._id,
+            estadoAnterior,
+            estadoNuevo: updates.status,
+            cambiadoPor: user._id,
+        });
+    }
+
+
     // si el admin cambió el estado y el reporte es principal
     // actualizamos el estado de todos los reportes adheridos
-    if (updates.status && report.esPrincipal && report.adheridos.length > 0) {
+    if (cambioEstado && report.esPrincipal && report.adheridos.length > 0) {
         const reporteIds = report.adheridos.map((a) => a.reporteId);
+
+        // capturamos el estado anterior de cada adherido ANTES de actualizarlos
+        const adheridosDocs = await reportModel.find(
+            { _id: { $in: reporteIds } },
+            { _id: 1, status: 1 }
+        );
+
         await reportModel.updateMany(
             { _id: { $in: reporteIds } },
             { $set: { status: updates.status } }
         );
+
+        const historialAdheridos = adheridosDocs.map((adherido) => ({
+            reportId: adherido._id,
+            estadoAnterior: adherido.status,
+            estadoNuevo: updates.status,
+            cambiadoPor: user._id,
+            comentario: "Actualizado automáticamente por sincronización con el reporte principal",
+        }));
+        await ReportStatusHistory.insertMany(historialAdheridos);
     }
 
     return report;
+};
+
+/* Devuelve el historial de cambios de estado de un reporte */
+const getReportHistorial = async (reportId) => {
+    const report = await reportModel.findById(reportId);
+    if (!report) throw new Error("Reporte no encontrado");
+
+    const historial = await ReportStatusHistory
+        .find({ reportId })
+        .populate("cambiadoPor", "nombre role")
+        .sort({ createdAt: 1 });
+
+    return { report, historial };
 };
 
 /* Elimina un reporte */
@@ -252,4 +297,4 @@ const calcularPrioridad = (severidadInicial, adhesiones) => {
     return niveles[nuevoIndex];
 };
 
-module.exports = { createReport, getAllReports, getReportById, updateReport, deleteReport, getReportsByUser, getNearbyReports, adherirReporte };
+module.exports = { createReport, getAllReports, getReportById, updateReport, deleteReport, getReportsByUser, getNearbyReports, adherirReporte, getReportHistorial };

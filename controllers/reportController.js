@@ -111,6 +111,41 @@ const getNearbyReports = async (req, res) => {
 
 
 
+const getReportHistorial = async (req, res) => {
+    try {
+        const clerkUserId = req.clerkUserId;
+        const user = await require("../models/userModel").findOne({ clerkUserId });
+        if (!user) return res.status(401).json({ error: "Usuario no encontrado" });
+
+        const isAdmin = ["admin", "superadmin"].includes(user.role);
+        const { historial, report } = await reportService.getReportHistorial(req.params.id);
+
+        // ciudadano solo puede ver historial de sus propios reportes
+        if (!isAdmin && report.userId.toString() !== user._id.toString()) {
+            return res.status(403).json({ error: "No tenés permiso para ver este historial" });
+        }
+
+        if (isAdmin) {
+            return res.status(200).json(historial);
+        }
+
+        // versión simplificada para ciudadanos
+        const historialSimplificado = historial.map((entry) => ({
+            estadoAnterior: entry.estadoAnterior,
+            estadoNuevo:    entry.estadoNuevo,
+            fecha: entry.createdAt.toLocaleDateString("es-AR", {
+                day: "numeric", month: "long", year: "numeric",
+            }),
+            comentario: entry.comentario,
+        }));
+
+        return res.status(200).json(historialSimplificado);
+    } catch (error) {
+        const status = error.message === "Reporte no encontrado" ? 404 : 500;
+        return res.status(status).json({ error: error.message });
+    }
+};
+
 const adherirReporte = async (req, res) => {
     try {
         const clerkUserId = req.clerkUserId;
@@ -127,4 +162,4 @@ const adherirReporte = async (req, res) => {
 
 
 
-module.exports = { createReport, getAllReports, getReportById, updateReport, deleteReport, getMyReports, getNearbyReports, adherirReporte };
+module.exports = { createReport, getAllReports, getReportById, updateReport, deleteReport, getMyReports, getNearbyReports, adherirReporte, getReportHistorial };
