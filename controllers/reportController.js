@@ -111,6 +111,29 @@ const getNearbyReports = async (req, res) => {
 
 
 
+const getCiudadanoMapaData = async (req, res) => {
+    try {
+        const { lat, lng, radius } = req.query;
+        const data = await reportService.getCiudadanoMapaData(
+            lat != null ? parseFloat(lat) : null,
+            lng != null ? parseFloat(lng) : null,
+            radius ? parseInt(radius) : 2000
+        );
+        return res.status(200).json(data);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+const getHeatmapData = async (req, res) => {
+    try {
+        const data = await reportService.getHeatmapData();
+        return res.status(200).json(data);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
 const getReportHistorial = async (req, res) => {
     try {
         const clerkUserId = req.clerkUserId;
@@ -133,8 +156,9 @@ const getReportHistorial = async (req, res) => {
         const historialSimplificado = historial.map((entry) => ({
             estadoAnterior: entry.estadoAnterior,
             estadoNuevo:    entry.estadoNuevo,
-            fecha: entry.createdAt.toLocaleDateString("es-AR", {
+            fecha: entry.createdAt.toLocaleString("es-AR", {
                 day: "numeric", month: "long", year: "numeric",
+                hour: "2-digit", minute: "2-digit",
             }),
             comentario: entry.comentario,
         }));
@@ -162,4 +186,4 @@ const adherirReporte = async (req, res) => {
 
 
 
-module.exports = { createReport, getAllReports, getReportById, updateReport, deleteReport, getMyReports, getNearbyReports, adherirReporte, getReportHistorial };
+module.exports = { createReport, getAllReports, getReportById, updateReport, deleteReport, getMyReports, getNearbyReports, adherirReporte, getReportHistorial, getHeatmapData, getCiudadanoMapaData };

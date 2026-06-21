@@ -180,6 +180,41 @@ const updateReport = async (reportId, clerkUserId, updates) => {
     return report;
 };
 
+/* Devuelve reportes activos para el mapa ciudadano */
+const getCiudadanoMapaData = async (lat, lng, radius = 2000) => {
+    const query = {
+        status: { $in: ["open", "in_progress"] },
+        esPrincipal: true,
+    };
+
+    if (lat != null && lng != null) {
+        const deg = radius / 111000;
+        query["location.lat"] = { $gte: lat - deg, $lte: lat + deg };
+        query["location.lng"] = { $gte: lng - deg, $lte: lng + deg };
+    }
+
+    return reportModel
+        .find(query)
+        .select("title category status description createdAt adhesiones location imageUrls")
+        .sort({ createdAt: -1 });
+};
+
+/* Devuelve los puntos para el mapa de calor (solo reportes activos) */
+const getHeatmapData = async () => {
+    const PRIORITY_SCORE = { baja: 0, media: 10, alta: 20, critica: 30 };
+    const now = Date.now();
+
+    const reports = await reportModel
+        .find({ status: { $in: ["open", "in_progress"] }, esPrincipal: true })
+        .select("location priority adhesiones createdAt");
+
+    return reports.map((r) => {
+        const dias = Math.floor((now - new Date(r.createdAt).getTime()) / 86_400_000);
+        const score = (PRIORITY_SCORE[r.priority] ?? 0) + r.adhesiones * 1 + dias * 0.5;
+        return { lat: r.location.lat, lng: r.location.lng, score };
+    });
+};
+
 /* Devuelve el historial de cambios de estado de un reporte */
 const getReportHistorial = async (reportId) => {
     const report = await reportModel.findById(reportId);
@@ -297,4 +332,4 @@ const calcularPrioridad = (severidadInicial, adhesiones) => {
     return niveles[nuevoIndex];
 };
 
-module.exports = { createReport, getAllReports, getReportById, updateReport, deleteReport, getReportsByUser, getNearbyReports, adherirReporte, getReportHistorial };
+module.exports = { createReport, getAllReports, getReportById, updateReport, deleteReport, getReportsByUser, getNearbyReports, adherirReporte, getReportHistorial, getHeatmapData, getCiudadanoMapaData };
