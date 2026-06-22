@@ -1,193 +1,207 @@
 # Back_Guarda
 
-Backend de la aplicación Guarda con Node.js, Express, MongoDB y autenticación Clerk.
+Backend de la aplicación **Guarda!** — plataforma de reporte de incidentes urbanos para Villa María, Argentina.
 
-Esta API valida usuarios con Clerk, sincroniza la sesión con una colección de usuarios en MongoDB y expone recursos para gestionar reportes y usuarios.
+Construido con Node.js, Express, MongoDB y autenticación Clerk. Incluye análisis de reportes con IA (Google Gemini) para validación, clasificación de severidad y detección de duplicados.
 
 ## Tecnologías
 
-- Node.js
-- Express 5
+- Node.js + Express 5
 - MongoDB / Mongoose
-- Clerk (`@clerk/backend`) para autenticación JWT
-- CORS
-- dotenv
+- Clerk (`@clerk/backend`) — autenticación JWT y gestión de usuarios
+- Google Gemini (`@google/genai`) — análisis e IA
+- CORS, dotenv
 
-## Estructura principal
+## Estructura
 
-- `app.js` - punto de entrada del servidor
-- `config/mongo.js` - conexión a MongoDB
-- `routes/` - define los endpoints de la API
-- `controllers/` - recibe request/res y llama a servicios
-- `service/` - lógica de negocio y permisos
-- `models/` - esquemas de MongoDB
-- `middlewares/` - autenticación y autorización
+```
+back_guarda/
+├── app.js                  # punto de entrada
+├── config/mongo.js         # conexión a MongoDB
+├── routes/                 # endpoints
+├── controllers/            # manejo de request/response
+├── service/                # lógica de negocio
+│   ├── iaService.js        # análisis con Gemini
+│   ├── reportService.js    # lógica de reportes
+│   └── userService.js      # lógica de usuarios
+├── models/                 # esquemas Mongoose
+└── middlewares/            # auth y roles
+```
 
 ## Variables de entorno
 
-Crea un archivo `.env` en la raíz con los datos de tu entorno:
+Crea un archivo `.env` en la raíz:
 
 ```env
 PORT=3000
 MONGODB_URI=mongodb+srv://<usuario>:<password>@<cluster>.mongodb.net/<nombreDB>
 CLERK_SECRET_KEY=sk_test_xxxxxxxxxxxx
+GEMINI_API_KEY=tu_api_key_de_gemini
+GEMINI_API_KEY_2=tu_api_key_de_respaldo   # opcional — fallback si la primera agota cuota
+PUBLIC_API_KEY=clave_para_rutas_publicas
 ```
 
-> El `CLERK_SECRET_KEY` debe corresponder a la misma aplicación Clerk que usa el frontend.
+> `CLERK_SECRET_KEY` debe corresponder a la misma app Clerk que usa el frontend.
+> `GEMINI_API_KEY_2` actúa como respaldo automático si la key principal recibe un error 429.
 
-## Instalación
+## Instalación y ejecución
 
 ```bash
-cd back_guarda
 npm install
-```
-
-## Ejecución
-
-```bash
 node app.js
 ```
 
-El servidor quedará escuchando en el puerto definido en `PORT`.
+El servidor queda escuchando en el puerto definido en `PORT`.
 
-## Rutas principales
+---
 
-### Autenticación / sincronización
+## Rutas de la API
 
-#### POST `/api/auth/sync`
+### Autenticación
 
-Sincroniza el usuario autenticado con la base de datos local.
+#### `POST /api/auth/sync`
 
-- Requiere cabecera `Authorization: Bearer <token>`
-- Verifica el token con Clerk.
-- Recupera datos del usuario de Clerk y/o MongoDB.
-- Crea el usuario local si no existe.
-- Devuelve el rol del usuario.
+Sincroniza el usuario autenticado de Clerk con MongoDB. Crea el documento local si no existe.
 
-Request headers:
+**Headers:** `Authorization: Bearer <token>`
 
-```http
-Authorization: Bearer <session_jwt>
-Content-Type: application/json
-```
-
-Response ejemplo:
-
+**Response:**
 ```json
-{ "role": "citizen" }
+{ "role": "citizen", "mongoId": "6649a..." }
 ```
 
-### Reportes
+---
 
-Todas las rutas de reportes requieren autenticación con `Authorization: Bearer <token>`.
+### Reportes — `/api/reports`
 
-#### POST `/api/reports`
+Todas las rutas requieren `Authorization: Bearer <token>`.
 
-Crea un nuevo reporte.
+| Método | Ruta | Acceso | Descripción |
+|--------|------|--------|-------------|
+| `POST` | `/` | Autenticado | Crea un reporte. Pasa por validación IA (spam, emergencias), normalización de texto y detección de duplicados/similares. |
+| `GET` | `/` | admin, superadmin | Lista todos los reportes principales con datos del creador. |
+| `GET` | `/me` | Autenticado | Reportes del usuario autenticado. |
+| `GET` | `/nearby` | Autenticado | Reportes abiertos en un radio dado (query: `lat`, `lng`, `radius`). |
+| `GET` | `/heatmap` | admin, superadmin | Puntos para mapa de calor con score ponderado por severidad, adhesiones y antigüedad. |
+| `GET` | `/mapa-ciudadano` | Autenticado | Reportes activos filtrados por `etiquetas2` (impacto circulación/seguridad). Acepta `lat`, `lng`, `radius`. |
+| `POST` | `/:id/adherir` | Autenticado | Adhiere el usuario a un reporte existente. |
+| `GET` | `/:id/historial` | Autenticado | Historial de cambios de estado del reporte. |
+| `GET` | `/:id` | admin, superadmin | Ver un reporte por ID. |
+| `PUT` | `/:id` | Autenticado | Editar reporte. El dueño edita título/descripción/categoría. El admin también puede cambiar `status` y `priority`. |
+| `DELETE` | `/:id` | Autenticado | Elimina el reporte (solo dueño o admin). |
 
-Body JSON recomendado:
-
+**Body para `POST /`:**
 ```json
 {
-  "title": "Bache en la calle",
-  "description": "Gran bache en la esquina",
-  "category": "bache",
-  "location": {
-    "lat": -31.419,
-    "lng": -64.211,
-    "address": "Av. Principal 123"
-  },
-  "imageUrl": "https://..."
+  "title": "Bache en calle Sarmiento",
+  "description": "Bache profundo frente al número 450",
+  "category": "Calles",
+  "location": { "lat": -32.41, "lng": -63.23, "address": "Sarmiento 450" },
+  "imageUrls": ["https://..."],
+  "forzarCreacion": false
 }
 ```
 
-#### GET `/api/reports`
+**Respuestas posibles de `POST /`:**
 
-Lista todos los reportes. Se devuelve información del usuario creador en `userId`.
+| Status | Significado |
+|--------|-------------|
+| `201` | Reporte creado correctamente |
+| `200` | Hay reportes similares — devuelve `{ pendiente: true, similares: [...] }` para que el usuario decida |
+| `409` | Reporte duplicado del mismo usuario — devuelve `{ esDuplicado: true }` |
+| `422` | Reporte rechazado por IA (spam, contenido inválido o emergencia que requiere llamar al 100/101/107) — devuelve `{ rechazado: true, razon: "..." }` |
 
-#### GET `/api/reports/:id`
+---
 
-Devuelve un reporte por su ID.
+### Usuarios — `/api/users`
 
-#### PUT `/api/reports/:id`
+| Método | Ruta | Acceso | Descripción |
+|--------|------|--------|-------------|
+| `POST` | `/create-admin` | superadmin | Crea un usuario admin en Clerk y MongoDB. |
+| `GET` | `/` | superadmin | Lista todos los usuarios. |
+| `GET` | `/:id` | superadmin | Ver un usuario por ID. |
+| `PUT` | `/:id` | Autenticado | Editar usuario. El propio usuario puede cambiar `nombre`. El superadmin puede cambiar `nombre`, `role` e `isActive`. |
+| `DELETE` | `/:id` | superadmin | Soft delete: desactiva el usuario y lo banea en Clerk. |
 
-Actualiza un reporte.
+**Body para `POST /create-admin`:**
+```json
+{
+  "nombre": "Juan López",
+  "email": "juan@municipio.com",
+  "password": "minimo8caracteres"
+}
+```
 
-- Dueño del reporte puede editar `title`, `description`, `category`, `imageUrl`.
-- Admin/superadmin puede editar también `priority` y `status`.
+---
 
-#### DELETE `/api/reports/:id`
+### API pública — `/api/public`
 
-Elimina un reporte.
+Requieren header `x-api-key: <PUBLIC_API_KEY>`. No requieren sesión de usuario.
 
-- Solo el creador o un admin pueden eliminarlo.
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/resumen` | Estadísticas completas de reportes. |
+| `GET` | `/total` | Cantidad total de reportes. |
+| `GET` | `/por-estado` | Reportes agrupados por estado. |
+| `GET` | `/por-categoria` | Reportes agrupados por categoría. |
 
-### Usuarios
+---
 
-#### GET `/api/users`
+## Lógica de IA (iaService)
 
-Lista todos los usuarios.
+Todas las funciones usan Google Gemini con reintentos automáticos ante errores de sobrecarga (503). Los errores de cuota (429) fallan rápido y si hay una segunda key configurada (`GEMINI_API_KEY_2`), se usa automáticamente como respaldo.
 
-- Esta ruta está protegida a `superadmin`.
+| Función | Descripción |
+|---------|-------------|
+| `validateReport` | Detecta spam, contenido ficticio, fuera de lugar, ofensivo o situaciones de emergencia que deben derivarse al 100/101/107. |
+| `normalizeReport` | Corrige ortografía y redacción sin cambiar el significado. |
+| `analyzeReport` | Asigna `severidad`, `etiquetas`, `etiquetas2` (impacto circulación/seguridad) y `resumen`. |
+| `analyzeSimilarReports` | Compara el reporte nuevo con cercanos para detectar duplicados y similares. Tiene fallback rule-based si la IA falla. |
 
-#### GET `/api/users/:id`
-
-Devuelve datos de un usuario por ID.
-
-- Esta ruta está protegida para `superadmin`.
-- Solo un `superadmin` puede acceder a este endpoint.
-
-#### PUT `/api/users/:id`
-
-Edita un usuario.
-
-- Un usuario puede editar su propio `nombre`.
-- `superadmin` puede editar `nombre` y `role`.
-
-#### DELETE `/api/users/:id`
-
-Elimina un usuario.
-
-- Solo `superadmin` puede eliminar usuarios.
-- No se debe permitir eliminar el propio usuario si es superadmin.
+---
 
 ## Modelos
 
 ### User
 
-- `clerkUserId` (String, requerido, único)
-- `nombre` (String, requerido)
-- `email` (String, requerido, único)
-- `role` (`citizen`, `admin`, `superadmin`, default `citizen`)
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| `clerkUserId` | String | único, requerido |
+| `nombre` | String | requerido |
+| `email` | String | único, requerido |
+| `role` | `citizen` \| `admin` \| `superadmin` | default `citizen` |
+| `isActive` | Boolean | default `true` |
+| `deletedAt` | Date | null si activo |
 
 ### Report
 
-- `userId` (ObjectId ref `User`)
-- `title` (String requerido)
-- `description` (String requerido)
-- `category` (`bache`, `luminaria`, `residuos`, `inundacion`, `vandalismo`, `otro`)
-- `priority` (`baja`, `media`, `alta`, `critica`, default `baja`)
-- `status` (`open`, `in_progress`, `resolved`, default `open`)
-- `location` (objeto con `lat`, `lng`, `address`)
-- `imageUrl` (String opcional)
-- `esPrincipal`, `reportePrincipalId`, `adhesiones`, `adheridos`
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| `userId` | ObjectId | ref `User` |
+| `title` | String | requerido |
+| `description` | String | requerido |
+| `category` | String | Calles, Alumbrado, Higiene urbana, Tránsito, Espacios verdes, Otro |
+| `priority` | `baja` \| `media` \| `alta` \| `critica` | se recalcula con adhesiones |
+| `status` | `open` \| `in_progress` \| `resolved` | default `open` |
+| `location` | `{ lat, lng, address }` | requerido |
+| `imageUrls` | String[] | opcional |
+| `esPrincipal` | Boolean | false si es un reporte adherido |
+| `adhesiones` | Number | cantidad de adhesiones |
+| `adheridos` | Array | `[{ userId, reporteId }]` |
+| `aiAnalysis` | Object | `{ severidad, etiquetas, etiquetas2, resumen }` |
 
-## Notas
+---
 
-- El backend depende de Clerk para validar el JWT y obtener al usuario autenticado.
-- `requireAuth` valida el token y proporciona datos de la sesión.
-- `requireRole` controla permisos adicionales consultando el usuario local en MongoDB.
+## Middlewares
 
-## Uso recomendado
+- **`requireAuth`** — valida el JWT de Clerk, carga `req.clerkUserId` y `req.user` (documento MongoDB).
+- **`requireRole(...roles)`** — verifica que `req.user.role` esté entre los roles permitidos.
+- **`requireApiKey`** — valida el header `x-api-key` contra `PUBLIC_API_KEY` para rutas públicas.
 
-1. Configura el frontend para usar la misma app Clerk.
-2. Autentica el usuario y obtén el JWT.
-3. Llama a `/api/auth/sync` para asegurar que el usuario exista en MongoDB.
-4. Usa las rutas de reportes y usuarios con el token en el header.
+---
 
-## Token manual
+## Obtener token manualmente (Postman / Insomnia)
 
-1. Inicia sesión en el frontend.
-2. En la consola del navegador, ejecuta `await window.Clerk.session.getToken()`.
-3. Usa ese token como `Bearer <token>` en Postman o Insomnia.
-
+1. Iniciá sesión en el frontend.
+2. En la consola del navegador: `await window.Clerk.session.getToken()`
+3. Usá ese valor como `Authorization: Bearer <token>`.
