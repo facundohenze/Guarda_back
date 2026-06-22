@@ -114,7 +114,42 @@ const deleteUser = async (userId, reqUser) => {
 
 }
 
-module.exports = { syncUser, getAllUsers, getUsersById, updateUser, deleteUser };
+const createAdmin = async (nombre, email, password, reqUser) => {
+    if (reqUser.role !== "superadmin") {
+        throw new Error("No tenés permisos para crear administradores");
+    }
+
+    const existingUser = await userModel.findOne({ email });
+    if (existingUser) {
+        throw new Error("Ya existe un usuario con ese email");
+    }
+
+    // Crear usuario en Clerk
+    let clerkUser;
+    try {
+        clerkUser = await clerk.users.createUser({
+            emailAddress: [email],
+            password,
+            firstName: nombre,
+        });
+    } catch (err) {
+        const clerkError = err?.errors?.[0]?.message || err.message;
+        throw new Error(`Error al crear usuario en Clerk: ${clerkError}`);
+    }
+
+    // Crear en MongoDB con rol admin
+    const newUser = await userModel.create({
+        clerkUserId: clerkUser.id,
+        nombre,
+        email,
+        role: "admin",
+    });
+
+    return newUser;
+};
+
+
+module.exports = { syncUser, getAllUsers, getUsersById, updateUser, deleteUser, createAdmin };
 
 
 
