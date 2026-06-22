@@ -28,7 +28,7 @@ const syncUser = async (clerkUserId, nombre, email) => {
         console.log("usuario creado:", user);
     }
 
-    return { role: user.role };
+    return { role: user.role, mongoId: user._id };
 };
 
 const getAllUsers = async () => {

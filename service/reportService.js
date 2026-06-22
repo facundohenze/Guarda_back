@@ -185,6 +185,7 @@ const getCiudadanoMapaData = async (lat, lng, radius = 2000) => {
     const query = {
         status: { $in: ["open", "in_progress"] },
         esPrincipal: true,
+        "aiAnalysis.etiquetas2.0": { $exists: true },
     };
 
     if (lat != null && lng != null) {
@@ -195,7 +196,7 @@ const getCiudadanoMapaData = async (lat, lng, radius = 2000) => {
 
     return reportModel
         .find(query)
-        .select("title category status description createdAt adhesiones location imageUrls")
+        .select("title category status description createdAt adhesiones location imageUrls aiAnalysis.etiquetas2")
         .sort({ createdAt: -1 });
 };
 

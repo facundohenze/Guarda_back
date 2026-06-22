@@ -115,6 +115,10 @@ const reportSchema = new mongoose.Schema(
                 type: [String],
                 default: [],
             },
+            etiquetas2: {
+                type: [String],
+                default: [],
+            },
             resumen: {
                 type: String,
                 default: null,

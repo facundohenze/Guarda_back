@@ -49,8 +49,14 @@ Devolvé exactamente este formato JSON:
 {
   "severidad": "baja" | "media" | "alta" | "critica",
   "etiquetas": ["etiqueta1", "etiqueta2"],
+  "etiquetas2": [],
   "resumen": "una oración descriptiva del incidente"
 }
+
+Criterios para etiquetas2 — solo agregá las que apliquen, puede ser vacío:
+- "impacto_circulacion": el problema afecta directamente cómo se mueven las personas o vehículos por la ciudad (bache, árbol caído en la vía, semáforo roto, corte de calle, obra sin señalización, vereda rota con riesgo de caída, etc.)
+- "impacto_seguridad": el problema representa un riesgo para la integridad de las personas (alumbrado apagado, poste caído, zona sin iluminación, cables sueltos, etc.)
+Si el reporte es puramente estético o no afecta la circulación ni la seguridad (pasto alto, pinturas deterioradas, cantero descuidado, etc.), dejá etiquetas2 vacío.
 
 Criterios de severidad:
 - critica: riesgo inmediato para personas (accidente de tránsito, choque de vehículos, heridos, semáforo apagado en cruce, poste caído, inundación grave, incendio, gas, etc)
@@ -65,6 +71,7 @@ Criterios de severidad:
 
         if (!["baja", "media", "alta", "critica"].includes(parsed.severidad)) parsed.severidad = "media";
         if (!Array.isArray(parsed.etiquetas)) parsed.etiquetas = [];
+        if (!Array.isArray(parsed.etiquetas2)) parsed.etiquetas2 = [];
         if (typeof parsed.resumen !== "string") parsed.resumen = "";
 
         return parsed;
