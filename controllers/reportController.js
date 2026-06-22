@@ -18,6 +18,7 @@ const createReport = async (req, res) => {
             forzarCreacion,
         });
 
+        if (result.rechazado) return res.status(422).json(result);
         if (result.esDuplicado) return res.status(409).json(result);
         if (result.pendiente) return res.status(200).json(result);
         return res.status(201).json(result);

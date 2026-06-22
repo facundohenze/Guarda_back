@@ -1,6 +1,6 @@
 const reportModel = require("../models/reportModel");
 const userModel = require("../models/userModel");
-const { normalizeReport, analyzeReport, analyzeSimilarReports } = require("./iaService");
+const { normalizeReport, analyzeReport, analyzeSimilarReports, validateReport } = require("./iaService");
 const ReportStatusHistory = require("../models/reportStatusHistoryModel");
 
 /* Crea un nuevo reporte */
@@ -11,17 +11,21 @@ const createReport = async (clerkUserId, { title, description, category, locatio
     // 1. normalizamos título y descripción antes de cualquier análisis
     ({ title, description } = await normalizeReport(title, description));
 
+    // 2. validamos que el reporte sea legítimo
+    const { valido, razon } = await validateReport(title, description, category);
+    if (!valido) return { rechazado: true, razon };
+
     if (!forzarCreacion) { /* si viene con true, saltea busqueda */
-        // 2. buscamos reportes cercanos en un radio de 50 metros
+        // 3. buscamos reportes cercanos en un radio de 50 metros
         const nearbyReports = await getNearbyReports(location.lat, location.lng, 50);
 
-        // 3. mandamos a la IA los reportes cercanos + el nuevo para detectar duplicados y similares
+        // 4. mandamos a la IA los reportes cercanos + el nuevo para detectar duplicados y similares
         const { duplicado, similares } = await analyzeSimilarReports(
             { title, description, category, userId: user._id }, /* nuevo */
             nearbyReports /* cernanos */
         );
 
-        // 4. si hay duplicado del mismo usuario, avisamos sin guardar
+        // 5. si hay duplicado del mismo usuario, avisamos sin guardar
         if (duplicado) {
             return {
                 esDuplicado: true,
@@ -30,7 +34,7 @@ const createReport = async (clerkUserId, { title, description, category, locatio
             };
         }
 
-        // 5. si hay similares, devolvemos sin guardar para que el usuario decida
+        // 6. si hay similares, devolvemos sin guardar para que el usuario decida
         if (similares.length > 0) {
             const similaresTrimmed = similares.map(id => String(id).trim());
             let reportesSimilares = nearbyReports.filter((r) => similaresTrimmed.includes(r._id.toString()));
@@ -44,10 +48,10 @@ const createReport = async (clerkUserId, { title, description, category, locatio
         }
     }
 
-    // 6. analizamos el reporte con IA para obtener severidad, etiquetas y resumen
+    // 7. analizamos el reporte con IA para obtener severidad, etiquetas y resumen
     const aiAnalysis = await analyzeReport(title, description, category);
 
-    // 7. guardamos el reporte
+    // 8. guardamos el reporte
     const report = await reportModel.create({
         userId: user._id,
         title,

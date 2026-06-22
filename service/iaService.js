@@ -1,12 +1,29 @@
 const { GoogleGenAI } = require("@google/genai");
 
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const genAI2 = process.env.GEMINI_API_KEY_2
+    ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY_2 })
+    : null;
 
-const generateContent = (prompt) => genAI.models.generateContent({
+const callModel = (client, prompt) => client.models.generateContent({
     model: "gemini-2.5-flash-lite",
     contents: prompt,
     config: { temperature: 0.1 },
 });
+
+const generateContent = async (prompt) => {
+    try {
+        return await callModel(genAI, prompt);
+    } catch (err) {
+        const msg = String(err?.message ?? '');
+        const isRateLimited = err?.status === 429 || msg.includes('429') || msg.toLowerCase().includes('quota');
+        if (isRateLimited && genAI2) {
+            console.warn('[iaService] API key principal sin cuota, usando respaldo…');
+            return await callModel(genAI2, prompt);
+        }
+        throw err;
+    }
+};
 
 const parseJSON = (text) => {
     const match = text.match(/\{[\s\S]*\}/);
@@ -19,11 +36,11 @@ const withRetry = async (fn, { retries = 4, baseDelay = 1000, label = 'ia' } = {
         try {
             return await fn();
         } catch (err) {
-            const isOverloaded =
-                err?.status === 503 ||
-                String(err?.message).includes('503') ||
-                String(err?.message).toLowerCase().includes('overload');
+            const msg = String(err?.message ?? '');
+            const isRateLimited = err?.status === 429 || msg.includes('429') || msg.toLowerCase().includes('quota');
+            const isOverloaded = err?.status === 503 || msg.includes('503') || msg.toLowerCase().includes('overload');
 
+            if (isRateLimited) throw err; // falla rápido, no tiene sentido reintentar
             if (!isOverloaded || attempt === retries) throw err;
 
             const delay = baseDelay * Math.pow(2, attempt);
@@ -162,6 +179,55 @@ const detectDuplicatesRuleBased = (newReport, nearbyReports) => {
     };
 };
 
+/* Valida si un reporte es legítimo o parece inventado, spam o fuera de lugar */
+const validateReport = async (title, description, category) => {
+    const prompt = `
+Sos un asistente municipal que valida reportes ciudadanos en Villa María, Argentina.
+Analizá si el siguiente reporte es legítimo o si parece inventado, exagerado, spam o inapropiado.
+Devolvé ÚNICAMENTE un JSON válido, sin texto adicional, sin bloques de código, sin explicaciones.
+
+Reporte:
+- Título: ${title}
+- Descripción: ${description}
+- Categoría: ${category}
+
+Devolvé exactamente este formato JSON:
+{
+  "valido": true | false,
+  "razon": "explicación breve y amable si es inválido, o cadena vacía si es válido"
+}
+
+Criterios para marcar como INVÁLIDO (valido: false):
+- Spam o prueba: texto sin sentido, caracteres aleatorios, o palabras como "test", "prueba", "hola", "asdf", etc.
+- Imposible o ficticio: eventos que no pueden ocurrir en la realidad urbana (invasión alienígena, terremoto, tsunami, etc.)
+- Exagerado hasta lo absurdo: describe catástrofes mundiales o apocalípticas por un incidente menor
+- Sin relación con incidentes urbanos: contenido político, publicitario, personal, chistes o memes
+- Ofensivo o inapropiado: insultos, contenido discriminatorio o sexual
+- Emergencia que requiere servicios de urgencia: si el reporte describe una situación que requiere atención inmediata de bomberos, policía o ambulancia (incendio activo, accidente con heridos, robo en curso, persona inconsciente, personas con comportamientos extraños, personas deambulando, pelea con violencia, etc.), marcarlo como inválido e indicar en "razon" a qué número llamar. Usá este formato exacto en "razon": "Esta situación requiere atención inmediata. Llamá al [número]: [servicio]." donde [número] y [servicio] son uno de estos: 100 - Bomberos, 101 - Policía, 107 - SAME / Ambulancia. Si aplica más de uno, mencioná todos.
+
+Criterios para marcar como VÁLIDO (valido: true):
+- Cualquier problema real de infraestructura o servicios urbanos: bache, basura, luminaria, semáforo, ruidos, obras, etc.
+- Situaciones resueltas que dejaron daño (hubo un incendio y quedó daño en la vía pública, ya no hay heridos pero hay un poste caído, etc.)
+- Aunque el redactado sea informal o con errores ortográficos
+- Aunque la severidad sea baja o el problema sea menor
+- En caso de duda, marcar como válido
+`;
+
+    const run = async () => {
+        const result = await generateContent(prompt);
+        const parsed = parseJSON(result.text);
+        if (typeof parsed.valido !== "boolean") return { valido: true, razon: "" };
+        return { valido: parsed.valido, razon: parsed.razon ?? "" };
+    };
+
+    try {
+        return await withRetry(run, { retries: 4, baseDelay: 1000, label: 'validateReport' });
+    } catch (err) {
+        console.warn("[iaService] validateReport agotó reintentos, permitiendo el reporte:", err.message);
+        return { valido: true, razon: "" };
+    }
+};
+
 /* Normaliza título y descripción: corrige ortografía, gramática y redacción */
 const normalizeReport = async (title, description) => {
     const prompt = `
@@ -193,4 +259,4 @@ Devolvé exactamente este formato JSON:
     }
 };
 
-module.exports = { normalizeReport, analyzeReport, analyzeSimilarReports };
+module.exports = { normalizeReport, analyzeReport, analyzeSimilarReports, validateReport };
