@@ -206,7 +206,7 @@ const getCiudadanoMapaData = async (lat, lng, radius = 2000) => {
 
 /* Devuelve los puntos para el mapa de calor (solo reportes activos) */
 const getHeatmapData = async () => {
-    const PRIORITY_SCORE = { baja: 0, media: 10, alta: 20, critica: 30 };
+    const PRIORITY_SCORE = { baja: 0, media: 10, alta: 15, critica: 20 };
     const now = Date.now();
 
     const reports = await reportModel

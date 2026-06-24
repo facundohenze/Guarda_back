@@ -118,7 +118,7 @@ const getCiudadanoMapaData = async (req, res) => {
         const data = await reportService.getCiudadanoMapaData(
             lat != null ? parseFloat(lat) : null,
             lng != null ? parseFloat(lng) : null,
-            radius ? parseInt(radius) : 2000
+            radius ? parseInt(radius) : 1000
         );
         return res.status(200).json(data);
     } catch (error) {
@@ -156,7 +156,7 @@ const getReportHistorial = async (req, res) => {
         // versión simplificada para ciudadanos
         const historialSimplificado = historial.map((entry) => ({
             estadoAnterior: entry.estadoAnterior,
-            estadoNuevo:    entry.estadoNuevo,
+            estadoNuevo: entry.estadoNuevo,
             fecha: entry.createdAt.toLocaleString("es-AR", {
                 day: "numeric", month: "long", year: "numeric",
                 hour: "2-digit", minute: "2-digit",
