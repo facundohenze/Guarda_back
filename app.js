@@ -8,7 +8,12 @@ const reportRoutes = require("./routes/reportRoutes")
 const userRoutes = require("./routes/userRoutes")
 const publicRoutes = require("./routes/publicRoutes");
 
-app.use(cors())
+app.use(cors({
+    origin: [
+        "http://localhost:5173",
+        "https://guarda-reporte-incidentes-app-rnyi.vercel.app"
+    ]
+}))
 connectDB(); /* se conecta al arrancar el servidor */
 app.use(express.json())
 
