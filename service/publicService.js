@@ -60,4 +60,9 @@ const getResumen = async () => {
     };
 };
 
-module.exports = { getTotalReportes, getReportesPorEstado, getReportesPorCategoria, getResumen };
+/* Colección Report completa y cruda — FACT_reportes para Power BI (1 fila = 1 acto de reporte, original o adhesión) */
+const getReportes = async () => {
+    return reportModel.find().sort({ createdAt: -1 }).lean();
+};
+
+module.exports = { getTotalReportes, getReportesPorEstado, getReportesPorCategoria, getResumen, getReportes };

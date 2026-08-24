@@ -8,5 +8,6 @@ router.get("/resumen", requireApiKey, publicController.getResumen);             
 router.get("/total", requireApiKey, publicController.getTotalReportes);           /* cantidad total */
 router.get("/por-estado", requireApiKey, publicController.getReportesPorEstado);  /* por estado */
 router.get("/por-categoria", requireApiKey, publicController.getReportesPorCategoria); /* por categoría */
+router.get("/reportes", requireApiKey, publicController.getReportes); /* colección completa, cruda — para Power BI */
 
 module.exports = router;

@@ -36,4 +36,13 @@ const getReportesPorCategoria = async (req, res) => {
     }
 };
 
-module.exports = { getResumen, getTotalReportes, getReportesPorEstado, getReportesPorCategoria };
+const getReportes = async (req, res) => {
+    try {
+        const data = await publicService.getReportes();
+        return res.status(200).json(data);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+module.exports = { getResumen, getTotalReportes, getReportesPorEstado, getReportesPorCategoria, getReportes };
