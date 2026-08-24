@@ -49,7 +49,9 @@ const withRetry = async (fn, { retries = 4, baseDelay = 1000, label = 'ia' } = {
         }
     }
 };
-/* Analiza un reporte nuevo y devuelve severidad, etiquetas y resumen.
+const CATEGORIAS_VALIDAS = ["Calles", "Alumbrado", "Higiene urbana", "Tránsito", "Espacios verdes", "Otro"];
+
+/* Analiza un reporte nuevo y devuelve severidad, categoría, etiquetas y resumen.
    Reintenta hasta 4 veces con backoff exponencial si Gemini está saturado.
    Si todos los reintentos fallan, propaga el error (el reporte NO se crea). */
 const analyzeReport = async (title, description, category) => {
@@ -65,6 +67,7 @@ Reporte:
 Devolvé exactamente este formato JSON:
 {
   "severidad": "baja" | "media" | "alta" | "critica",
+  "categoria": "Calles" | "Alumbrado" | "Higiene urbana" | "Tránsito" | "Espacios verdes" | "Otro",
   "etiquetas": ["etiqueta1", "etiqueta2"],
   "etiquetas2": [],
   "resumen": "una oración descriptiva del incidente"
@@ -75,7 +78,10 @@ Criterios para etiquetas2 — solo agregá las que apliquen, puede ser vacío:
 - "impacto_seguridad": el problema representa un riesgo para la integridad de las personas (alumbrado apagado, poste caído, zona sin iluminación, cables sueltos, etc.)
 Si el reporte es puramente estético o no afecta la circulación ni la seguridad (pasto alto, pinturas deterioradas, cantero descuidado, etc.), dejá etiquetas2 vacío.
 
-Criterios de severidad:
+Criterio para categoria:
+corregí la categoría solo si claramente no corresponde al incidente descripto; si la que puso el usuario es razonable, devolvela igual
+
+Criterios de severidad — solo agregá las que apliquen
 - critica: riesgo inmediato para personas (accidente de tránsito, choque de vehículos, heridos, semáforo apagado en cruce, poste caído, inundación grave, incendio, gas, etc)
 - alta: problema importante que afecta la circulación o servicios básicos (bache profundo en arteria principal, árbol caído en la vía, corte de luz en zona amplia, pérdida de agua, etc)
 - media: problema visible que requiere atención pronta (bache en calle secundaria, luminaria apagada, basura acumulada, grafitis en edificio público, etc)
@@ -87,6 +93,7 @@ Criterios de severidad:
         const parsed = parseJSON(result.text);
 
         if (!["baja", "media", "alta", "critica"].includes(parsed.severidad)) parsed.severidad = "media";
+        if (!CATEGORIAS_VALIDAS.includes(parsed.categoria)) parsed.categoria = category;
         if (!Array.isArray(parsed.etiquetas)) parsed.etiquetas = [];
         if (!Array.isArray(parsed.etiquetas2)) parsed.etiquetas2 = [];
         if (typeof parsed.resumen !== "string") parsed.resumen = "";
@@ -180,7 +187,7 @@ const detectDuplicatesRuleBased = (newReport, nearbyReports) => {
 };
 
 /* Valida si un reporte es legítimo o parece inventado, spam o fuera de lugar */
-const validateReport = async (title, description, category) => {
+const validateReport = async (title, description) => {
     const prompt = `
 Sos un asistente municipal que valida reportes ciudadanos en Villa María, Argentina.
 Analizá si el siguiente reporte es legítimo o si parece inventado, exagerado, spam o inapropiado.
@@ -189,7 +196,6 @@ Devolvé ÚNICAMENTE un JSON válido, sin texto adicional, sin bloques de códig
 Reporte:
 - Título: ${title}
 - Descripción: ${description}
-- Categoría: ${category}
 
 Devolvé exactamente este formato JSON:
 {

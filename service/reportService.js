@@ -12,7 +12,7 @@ const createReport = async (clerkUserId, { title, description, category, locatio
     ({ title, description } = await normalizeReport(title, description));
 
     // 2. validamos que el reporte sea legítimo
-    const { valido, razon } = await validateReport(title, description, category);
+    const { valido, razon } = await validateReport(title, description);
     if (!valido) return { rechazado: true, razon };
 
     if (!forzarCreacion) { /* si viene con true, saltea busqueda */
@@ -56,7 +56,7 @@ const createReport = async (clerkUserId, { title, description, category, locatio
         userId: user._id,
         title,
         description,
-        category: category || "Otro",
+        category: aiAnalysis.categoria || category || "Otro",
         location,
         imageUrls: imageUrls || [],
         priority: aiAnalysis.severidad,
@@ -185,7 +185,7 @@ const updateReport = async (reportId, clerkUserId, updates) => {
 };
 
 /* Devuelve reportes activos para el mapa ciudadano */
-const getCiudadanoMapaData = async (lat, lng, radius = 2000) => {
+const getCiudadanoMapaData = async (lat, lng, radius = 1000) => {
     const query = {
         status: { $in: ["open", "in_progress"] },
         esPrincipal: true,
@@ -242,7 +242,7 @@ const deleteReport = async (reportId, clerkUserId) => {
     if (!report) throw new Error("Reporte no encontrado");
 
     const isOwner = report.userId.toString() === user._id.toString();
-    const isAdmin = user.role === "admin";
+    const isAdmin = ["admin", "superadmin"].includes(user.role);
 
     if (!isOwner && !isAdmin) {
         throw new Error("No tenés permisos para eliminar este reporte");
