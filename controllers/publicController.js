@@ -36,4 +36,14 @@ const getReportesPorCategoria = async (req, res) => {
     }
 };
 
-module.exports = { getResumen, getTotalReportes, getReportesPorEstado, getReportesPorCategoria };
+const getUsuarios = async (req, res) => {
+    try {
+        const usuarios = await publicService.getUsuarios();
+        return res.status(200).json(usuarios);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+
+}
+
+module.exports = { getUsuarios, getResumen, getTotalReportes, getReportesPorEstado, getReportesPorCategoria };

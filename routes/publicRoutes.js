@@ -9,4 +9,6 @@ router.get("/total", requireApiKey, publicController.getTotalReportes);         
 router.get("/por-estado", requireApiKey, publicController.getReportesPorEstado);  /* por estado */
 router.get("/por-categoria", requireApiKey, publicController.getReportesPorCategoria); /* por categoría */
 
+router.get("/usuarios", requireApiKey, publicController.getUsuarios);
+
 module.exports = router;

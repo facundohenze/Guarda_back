@@ -1,4 +1,5 @@
 const reportModel = require("../models/reportModel");
+const userModel = require("../models/userModel");
 
 /* Total de reportes */
 const getTotalReportes = async () => {
@@ -60,4 +61,14 @@ const getResumen = async () => {
     };
 };
 
-module.exports = { getTotalReportes, getReportesPorEstado, getReportesPorCategoria, getResumen };
+const getUsuarios = async () => {
+    const usuarios = await userModel.find({}).select('-__v -clerkUserId -email -nombre').lean();
+    return usuarios.map(u => ({
+        id: u._id,
+        rol: u.role,
+        activo: u.isActive,
+        creadoEn: u.createdAt,
+    }));
+};
+
+module.exports = { getUsuarios, getTotalReportes, getReportesPorEstado, getReportesPorCategoria, getResumen };
