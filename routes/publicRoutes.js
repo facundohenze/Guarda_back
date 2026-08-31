@@ -10,4 +10,7 @@ router.get("/por-estado", requireApiKey, publicController.getReportesPorEstado);
 router.get("/por-categoria", requireApiKey, publicController.getReportesPorCategoria); /* por categoría */
 router.get("/reportes", requireApiKey, publicController.getReportes); /* colección completa, cruda — para Power BI */
 
+router.get("/usuarios", requireApiKey, publicController.getUsuarios);
+router.get("/historial-estados", requireApiKey, publicController.getHistorialEstados);
+
 module.exports = router;

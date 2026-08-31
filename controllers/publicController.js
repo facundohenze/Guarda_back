@@ -45,4 +45,24 @@ const getReportes = async (req, res) => {
     }
 };
 
-module.exports = { getResumen, getTotalReportes, getReportesPorEstado, getReportesPorCategoria, getReportes };
+
+const getUsuarios = async (req, res) => {
+    try {
+        const usuarios = await publicService.getUsuarios();
+        return res.status(200).json(usuarios);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+
+}
+
+const getHistorialEstados = async (req, res) => {
+    try {
+        const historial = await publicService.getHistorialEstados();
+        return res.status(200).json(historial);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+}
+
+module.exports = { getReportes, getHistorialEstados, getUsuarios, getResumen, getTotalReportes, getReportesPorEstado, getReportesPorCategoria };
