@@ -10,5 +10,6 @@ router.get("/por-estado", requireApiKey, publicController.getReportesPorEstado);
 router.get("/por-categoria", requireApiKey, publicController.getReportesPorCategoria); /* por categoría */
 
 router.get("/usuarios", requireApiKey, publicController.getUsuarios);
+router.get("/historial-estados", requireApiKey, publicController.getHistorialEstados);
 
 module.exports = router;

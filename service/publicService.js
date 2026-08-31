@@ -1,5 +1,6 @@
 const reportModel = require("../models/reportModel");
 const userModel = require("../models/userModel");
+const reportStatusHistoryModel = require("../models/reportStatusHistoryModel");
 
 /* Total de reportes */
 const getTotalReportes = async () => {
@@ -71,4 +72,10 @@ const getUsuarios = async () => {
     }));
 };
 
-module.exports = { getUsuarios, getTotalReportes, getReportesPorEstado, getReportesPorCategoria, getResumen };
+/* Colección completa de cambios de estado (para análisis histórico) */
+const getHistorialEstados = async () => {
+    const historial = await reportStatusHistoryModel.find({}).select('-__v').lean();
+    return historial;
+};
+
+module.exports = { getHistorialEstados, getUsuarios, getTotalReportes, getReportesPorEstado, getReportesPorCategoria, getResumen };

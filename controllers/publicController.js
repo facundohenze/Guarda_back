@@ -46,4 +46,13 @@ const getUsuarios = async (req, res) => {
 
 }
 
-module.exports = { getUsuarios, getResumen, getTotalReportes, getReportesPorEstado, getReportesPorCategoria };
+const getHistorialEstados = async (req, res) => {
+    try {
+        const historial = await publicService.getHistorialEstados();
+        return res.status(200).json(historial);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+}
+
+module.exports = { getHistorialEstados, getUsuarios, getResumen, getTotalReportes, getReportesPorEstado, getReportesPorCategoria };
