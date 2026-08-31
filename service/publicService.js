@@ -62,9 +62,26 @@ const getResumen = async () => {
     };
 };
 
-/* Colección Report completa y cruda — FACT_reportes para Power BI (1 fila = 1 acto de reporte, original o adhesión) */
+/* FACT_reportes — 1 fila = 1 acto de reporte (original o adhesión) */
 const getReportes = async () => {
-    return reportModel.find().sort({ createdAt: -1 }).lean();
+    const reportes = await reportModel.find({}).select('-__v').lean();
+    return reportes.map(r => ({
+        id: r._id,
+        userId: r.userId,
+        titulo: r.title,
+        categoria: r.category,
+        estado: r.status,
+        prioridad: r.priority,
+        lat: r.location?.lat,
+        lng: r.location?.lng,
+        barrio: r.location?.barrio,
+        severidad: r.aiAnalysis?.severidad,
+        esPrincipal: r.esPrincipal,
+        reportePrincipalId: r.reportePrincipalId ?? null,
+        adhesiones: r.adhesiones,
+        creadoEn: r.createdAt,
+        actualizadoEn: r.updatedAt,
+    }));
 };
 
 
@@ -78,10 +95,17 @@ const getUsuarios = async () => {
     }));
 };
 
-/* Colección completa de cambios de estado (para análisis histórico) */
+/* FACT_historial_estados — cada fila es un cambio de estado de un reporte */
 const getHistorialEstados = async () => {
-    const historial = await reportStatusHistoryModel.find({}).select('-__v').lean();
-    return historial;
+    const historial = await reportStatusHistoryModel.find({}).select('-__v -comentario -updatedAt').lean();
+    return historial.map(h => ({
+        id: h._id,
+        reportId: h.reportId,
+        estadoAnterior: h.estadoAnterior,
+        estadoNuevo: h.estadoNuevo,
+        cambiadoPor: h.cambiadoPor,
+        creadoEn: h.createdAt,
+    }));
 };
 
 module.exports = { getReportes, getHistorialEstados, getUsuarios, getTotalReportes, getReportesPorEstado, getReportesPorCategoria, getResumen };
