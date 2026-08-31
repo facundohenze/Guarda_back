@@ -140,10 +140,31 @@ Requieren header `x-api-key: <PUBLIC_API_KEY>`. No requieren sesión de usuario.
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| `GET` | `/resumen` | Estadísticas completas de reportes. |
+| `GET` | `/resumen` | Estadísticas completas de reportes (total + por estado + por categoría). |
 | `GET` | `/total` | Cantidad total de reportes. |
 | `GET` | `/por-estado` | Reportes agrupados por estado. |
 | `GET` | `/por-categoria` | Reportes agrupados por categoría. |
+| `GET` | `/reportes` | Colección de reportes con campos mapeados para Power BI (`FACT_reportes`). |
+| `GET` | `/usuarios` | Colección de usuarios anonimizada para Power BI (sin nombre, email ni `clerkUserId`). |
+| `GET` | `/historial-estados` | Historial completo de cambios de estado (`FACT_historial_estados`). |
+
+#### Modelo de datos para Power BI
+
+Los endpoints `/reportes`, `/usuarios` e `/historial-estados` devuelven campos ya seleccionados y renombrados según el modelo BI (no exponen la colección cruda).
+
+**`GET /reportes`** — 1 fila = 1 acto de reporte (original o adhesión):
+
+`id`, `userId`, `titulo`, `categoria`, `estado`, `prioridad`, `lat`, `lng`, `barrio`, `severidad` (extraído de `aiAnalysis`), `esPrincipal`, `reportePrincipalId`, `adhesiones`, `creadoEn`, `actualizadoEn`.
+
+> `location` se aplana en `lat`/`lng`/`barrio`. No se incluyen `description`, `imageUrls` ni `adheridos`.
+
+**`GET /usuarios`** — `id`, `rol`, `activo`, `creadoEn`.
+
+**`GET /historial-estados`** — cada fila es un cambio de estado de un reporte:
+
+`id`, `reportId`, `estadoAnterior`, `estadoNuevo`, `cambiadoPor`, `creadoEn`.
+
+> No se incluyen `comentario` ni `updatedAt`.
 
 ---
 
