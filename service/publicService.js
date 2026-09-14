@@ -91,7 +91,8 @@ const getUsuarios = async () => {
         id: u._id,
         rol: u.role,
         activo: u.isActive,
-        creadoEn: u.createdAt,
+        desactivadoEn: u.deletedAt ?? null,
+        creadoEn: u.createdAt
     }));
 };
 

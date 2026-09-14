@@ -122,6 +122,8 @@ const randomDateInLastMonths = (months = 6) => {
 };
 
 const addDays = (date, days) => new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+const maxDate = (a, b) => (a.getTime() >= b.getTime() ? a : b);
+const minDate = (a, b) => (a.getTime() <= b.getTime() ? a : b);
 
 async function main() {
     if (!process.env.MONGODB_URI) throw new Error("Falta MONGODB_URI en el .env");
@@ -141,12 +143,18 @@ async function main() {
     }
 
     // 1. usuarios fabricados (citizens + un puñado de admins para el historial de estados)
+    // createdAt disperso en el tiempo (antes se usaba un único "now" para todos, lo que
+    // concentraba las 205 altas en el mismo instante). Los admins arrancan con una ventana
+    // más amplia que los citizens para que existan admins "antiguos" capaces de haber
+    // gestionado reportes viejos.
     const N_CITIZENS = 200;
     const N_ADMINS = 5;
-    const now = new Date();
+    const CITIZEN_JOIN_MONTHS_BACK = 7;
+    const ADMIN_JOIN_MONTHS_BACK = 9;
     const users = [];
 
     for (let i = 0; i < N_CITIZENS; i++) {
+        const createdAt = randomDateInLastMonths(CITIZEN_JOIN_MONTHS_BACK);
         users.push({
             _id: new mongoose.Types.ObjectId(),
             clerkUserId: `seed_citizen_${String(i).padStart(4, "0")}`,
@@ -156,12 +164,13 @@ async function main() {
             isActive: true,
             deletedAt: null,
             _seed: true,
-            createdAt: now,
-            updatedAt: now,
+            createdAt,
+            updatedAt: createdAt,
         });
     }
     const admins = [];
     for (let i = 0; i < N_ADMINS; i++) {
+        const createdAt = randomDateInLastMonths(ADMIN_JOIN_MONTHS_BACK);
         const admin = {
             _id: new mongoose.Types.ObjectId(),
             clerkUserId: `seed_admin_${String(i).padStart(4, "0")}`,
@@ -171,8 +180,8 @@ async function main() {
             isActive: true,
             deletedAt: null,
             _seed: true,
-            createdAt: now,
-            updatedAt: now,
+            createdAt,
+            updatedAt: createdAt,
         };
         users.push(admin);
         admins.push(admin);
@@ -190,8 +199,9 @@ async function main() {
         const category = pick(CATEGORIAS);
         const estado = weightedPick([["open", 0.55], ["in_progress", 0.2], ["resolved", 0.25]]);
         const severidadBase = weightedPick([["baja", 0.35], ["media", 0.35], ["alta", 0.2], ["critica", 0.1]]);
-        const createdAt = randomDateInLastMonths(6);
         const creador = pick(users);
+        // el reporte nunca puede ser anterior a la fecha de alta de quien lo creó
+        const createdAt = maxDate(randomDateInLastMonths(6), creador.createdAt);
         const barrio = pick(BARRIOS);
         const addr = `${pick(["Av.", "Calle", "Bv."])} ${pick(["Italia", "San Martín", "Alvear", "Sarmiento", "Belgrano", "9 de Julio", "Corrientes"])} ${randInt(100, 2500)}`;
 
@@ -208,9 +218,10 @@ async function main() {
         const description = `Vecinos reportan ${title.toLowerCase()}. Se solicita intervención municipal.`;
 
         // fecha de "resolución" para poder medir tiempos de atención en el TP
+        // (topeada en HOY para no generar resoluciones "en el futuro")
         let updatedAt = createdAt;
-        if (estado === "in_progress") updatedAt = addDays(createdAt, randInt(1, 15));
-        if (estado === "resolved") updatedAt = addDays(createdAt, randInt(2, 30));
+        if (estado === "in_progress") updatedAt = minDate(addDays(createdAt, randInt(1, 15)), HOY);
+        if (estado === "resolved") updatedAt = minDate(addDays(createdAt, randInt(2, 30)), HOY);
 
         const principalId = new mongoose.Types.ObjectId();
         const location = { lat, lng, address: addr, barrio };
@@ -223,7 +234,8 @@ async function main() {
         for (let j = 0; j < adhesionesCount; j++) {
             const adherente = pick(posiblesAdherentes);
             const adheridoId = new mongoose.Types.ObjectId();
-            const adherCreatedAt = addDays(createdAt, randInt(0, 20));
+            // tampoco puede adherirse antes de haberse registrado
+            const adherCreatedAt = maxDate(addDays(createdAt, randInt(0, 20)), adherente.createdAt);
 
             adheridosArr.push({ userId: adherente._id, reporteId: adheridoId });
             adheridoDocs.push({
@@ -271,13 +283,15 @@ async function main() {
         );
 
         // historial de estados, coherente con el estado final del reporte principal
+        // (y con la fecha de alta del admin que hizo el cambio)
         if (estado === "in_progress" || estado === "resolved") {
-            const fechaEnProgreso = addDays(createdAt, randInt(1, 5));
+            const adminEnProgreso = pick(admins);
+            const fechaEnProgreso = maxDate(addDays(createdAt, randInt(1, 5)), adminEnProgreso.createdAt);
             historyDocs.push({
                 reportId: principalId,
                 estadoAnterior: "open",
                 estadoNuevo: "in_progress",
-                cambiadoPor: pick(admins)._id,
+                cambiadoPor: adminEnProgreso._id,
                 comentario: null,
                 _seed: true,
                 createdAt: fechaEnProgreso,
@@ -285,15 +299,17 @@ async function main() {
             });
         }
         if (estado === "resolved") {
+            const adminResuelve = pick(admins);
+            const fechaResuelto = maxDate(updatedAt, adminResuelve.createdAt);
             historyDocs.push({
                 reportId: principalId,
                 estadoAnterior: "in_progress",
                 estadoNuevo: "resolved",
-                cambiadoPor: pick(admins)._id,
+                cambiadoPor: adminResuelve._id,
                 comentario: null,
                 _seed: true,
-                createdAt: updatedAt,
-                updatedAt,
+                createdAt: fechaResuelto,
+                updatedAt: fechaResuelto,
             });
         }
 
