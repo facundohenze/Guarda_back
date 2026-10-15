@@ -2,6 +2,7 @@ const reportModel = require("../models/reportModel");
 const userModel = require("../models/userModel");
 const { normalizeReport, analyzeReport, analyzeSimilarReports, validateReport } = require("./iaService");
 const ReportStatusHistory = require("../models/reportStatusHistoryModel");
+const { notificarCambioEstado } = require("./reportEvents");
 
 /* Crea un nuevo reporte */
 const createReport = async (clerkUserId, { title, description, category, location, imageUrls, forzarCreacion }) => {
@@ -144,41 +145,9 @@ const updateReport = async (reportId, clerkUserId, updates) => {
 
     await report.save();
 
-    // si hubo cambio real de estado, registramos el historial del principal
+    // si hubo cambio real de estado, avisamos a los suscriptores (historial, adheridos, ...)
     if (cambioEstado) {
-        await ReportStatusHistory.create({
-            reportId: report._id,
-            estadoAnterior,
-            estadoNuevo: updates.status,
-            cambiadoPor: user._id,
-        });
-    }
-
-
-    // si el admin cambió el estado y el reporte es principal
-    // actualizamos el estado de todos los reportes adheridos
-    if (cambioEstado && report.esPrincipal && report.adheridos.length > 0) {
-        const reporteIds = report.adheridos.map((a) => a.reporteId);
-
-        // capturamos el estado anterior de cada adherido ANTES de actualizarlos
-        const adheridosDocs = await reportModel.find(
-            { _id: { $in: reporteIds } },
-            { _id: 1, status: 1 }
-        );
-
-        await reportModel.updateMany(
-            { _id: { $in: reporteIds } },
-            { $set: { status: updates.status } }
-        );
-
-        const historialAdheridos = adheridosDocs.map((adherido) => ({
-            reportId: adherido._id,
-            estadoAnterior: adherido.status,
-            estadoNuevo: updates.status,
-            cambiadoPor: user._id,
-            comentario: "Actualizado automáticamente por sincronización con el reporte principal",
-        }));
-        await ReportStatusHistory.insertMany(historialAdheridos);
+        await notificarCambioEstado({ report, estadoAnterior, estadoNuevo: updates.status, user });
     }
 
     return report;

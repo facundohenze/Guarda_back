@@ -1,34 +1,4 @@
-const { GoogleGenAI } = require("@google/genai");
-
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const genAI2 = process.env.GEMINI_API_KEY_2
-    ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY_2 })
-    : null;
-
-const callModel = (client, prompt) => client.models.generateContent({
-    model: "gemini-3.1-flash-lite",
-    contents: prompt,
-    config: { temperature: 0.1 },
-});
-
-const generateContent = async (prompt) => {
-    try {
-        return await callModel(genAI, prompt);
-    } catch (err) {
-        const msg = String(err?.message ?? '');
-        const isRateLimited = err?.status === 429 || msg.includes('429') || msg.toLowerCase().includes('quota');
-        if (isRateLimited && genAI2) {
-            console.warn('[iaService] API key principal sin cuota, usando respaldo…');
-            return await callModel(genAI2, prompt);
-        }
-        throw err;
-    }
-};
-
-const parseJSON = (text) => {
-    const match = text.match(/\{[\s\S]*\}/);
-    return JSON.parse(match ? match[0] : text);
-};
+const { pedirJSON } = require("./geminiAdapter");
 
 /* Reintentos con backoff exponencial — solo para errores de sobrecarga (503) */
 const withRetry = async (fn, { retries = 4, baseDelay = 1000, label = 'ia' } = {}) => {
@@ -36,12 +6,8 @@ const withRetry = async (fn, { retries = 4, baseDelay = 1000, label = 'ia' } = {
         try {
             return await fn();
         } catch (err) {
-            const msg = String(err?.message ?? '');
-            const isRateLimited = err?.status === 429 || msg.includes('429') || msg.toLowerCase().includes('quota');
-            const isOverloaded = err?.status === 503 || msg.includes('503') || msg.toLowerCase().includes('overload');
-
-            if (isRateLimited) throw err; // falla rápido, no tiene sentido reintentar
-            if (!isOverloaded || attempt === retries) throw err;
+            if (err?.tipo === "sin_cuota") throw err; // falla rápido, no tiene sentido reintentar
+            if (err?.tipo !== "sobrecarga" || attempt === retries) throw err;
 
             const delay = baseDelay * Math.pow(2, attempt);
             console.warn(`[iaService:${label}] Intento ${attempt + 1} fallido (sobrecarga), reintentando en ${delay}ms…`);
@@ -89,8 +55,7 @@ Criterios de severidad — solo agregá las que apliquen
 `;
 
     const run = async () => {
-        const result = await generateContent(prompt);
-        const parsed = parseJSON(result.text);
+        const parsed = await pedirJSON(prompt);
 
         if (!["baja", "media", "alta", "critica"].includes(parsed.severidad)) parsed.severidad = "media";
         if (!CATEGORIAS_VALIDAS.includes(parsed.categoria)) parsed.categoria = category;
@@ -156,9 +121,7 @@ Criterios:
 `;
 
     try {
-        const result = await generateContent(prompt);
-        const parsed = parseJSON(result.text);
-        return parsed;
+        return await pedirJSON(prompt);
     } catch (err) {
         console.warn("[iaService] analyzeSimilarReports falló, usando detección rule-based:", err.message);
         return detectDuplicatesRuleBased(newReport, nearbyReports);
@@ -221,8 +184,7 @@ Criterios para marcar como VÁLIDO (valido: true):
 `;
 
     const run = async () => {
-        const result = await generateContent(prompt);
-        const parsed = parseJSON(result.text);
+        const parsed = await pedirJSON(prompt);
         if (typeof parsed.valido !== "boolean") return { valido: true, razon: "" };
         return { valido: parsed.valido, razon: parsed.razon ?? "" };
     };
@@ -254,8 +216,7 @@ Devolvé exactamente este formato JSON:
 `;
 
     try {
-        const result = await generateContent(prompt);
-        const parsed = parseJSON(result.text);
+        const parsed = await pedirJSON(prompt);
         if (typeof parsed.title !== "string" || typeof parsed.description !== "string") {
             throw new Error("Formato inválido");
         }
